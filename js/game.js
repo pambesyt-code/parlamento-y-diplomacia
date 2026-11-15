@@ -7,7 +7,7 @@
 // s.duenos y s.ocupadas. Las reglas trabajan siempre «desde» una nación: usarNacion() la activa.
 
 const GUARDADO = 'pyd-partida-v6';
-const VERSION_GUARDADO = 6;
+const VERSION_GUARDADO = 7;
 const limitar = (n, min = 0, max = 100) => Math.max(min, Math.min(max, n));
 const alAzar = lista => lista[Math.floor(Math.random() * lista.length)];
 const provinciasDe = pid => PROVINCIAS.filter(p => p.pais === pid);
@@ -28,6 +28,8 @@ const esHumano = pid => !!(NACIONES[pid] && NACIONES[pid].humano);
 const CONFIG_BASE = {
   modo: 'gobierno', lider: 'Alex Montero', dificultad: 'normal', legislatura: 24,
   propio: true, partidoId: 'uc', partido: 'Unión Cívica', color: COLORES_PARTIDO[0], emblema: EMBLEMAS[0], principios: [],
+  // intervencion (cuánto Estado defiende, de 0 a 4) no se fija aquí: si no se elige, vale la de la doctrina.
+  doctrina: DOCTRINA_BASE,
   pais: 'Aldora', colorPais: COLORES_PAIS[0], tamano: 'mediano', semilla: 1, nPartidos: 5,
 };
 
@@ -35,11 +37,15 @@ const CONFIG_BASE = {
 function completarConfig(config) {
   const cfg = { ...CONFIG_BASE, ...config, principios: [...((config && config.principios) || [])] };
   if (!/^#[0-9a-f]{6}$/i.test(cfg.color)) cfg.color = COLORES_PARTIDO[0];
-  if (cfg.propio) cfg.partidoId = 'uc';
-  else {
+  if (cfg.propio) {
+    cfg.partidoId = 'uc';
+    if (!DOCTRINAS[cfg.doctrina]) cfg.doctrina = DOCTRINA_BASE;
+    cfg.intervencion = nivelIntervencion(cfg);
+    cfg.principios = cfg.principios.filter(t => PRINCIPIOS[t]).slice(0, MAX_PRINCIPIOS);
+  } else {
     if (!CATALOGO_PARTIDOS[cfg.partidoId]) cfg.partidoId = 'fo';
     const P = CATALOGO_PARTIDOS[cfg.partidoId];
-    Object.assign(cfg, { partido: P.nombre, color: P.color, emblema: P.emblema, principios: [] });
+    Object.assign(cfg, { partido: P.nombre, color: P.color, emblema: P.emblema, principios: [], doctrina: P.doctrina, intervencion: P.intervencion });
   }
   return cfg;
 }
@@ -48,9 +54,53 @@ function completarConfig(config) {
 // haya dado (el de centro si nadie más lo usa; si no, uno nuevo: j1, j2...).
 const huecoDe = cfg => cfg.hueco || (cfg.propio ? 'uc' : cfg.partidoId);
 
-// Hacia dónde se sienta un partido creado por un jugador, según sus principios.
-const EJE_PRINCIPIO = { izquierda: -2, derecha: 2, social: -0.6, orden: 1.2, verde: -0.8, agrario: 0.4 };
+// Hacia dónde tiran de un partido sus causas (de −2, izquierda, a +2, derecha).
+const EJE_PRINCIPIO = { izquierda: -2, derecha: 2, social: -0.6, orden: 1.2, verde: -0.8, agrario: 0.4, nacional: 1.2, global: -0.4, libertad: -0.4, tradicion: 1.2 };
 const ejeDePrincipios = p => (p.length ? p.reduce((a, t) => a + (EJE_PRINCIPIO[t] || 0), 0) / p.length : 0);
+
+// ---------- Ideario de un partido ----------
+// «perfil» es quien define al partido: la configuración de quien gobierna, el perfil de un jugador
+// de la oposición o, si alguien se ha unido a un partido del catálogo, ese partido.
+const doctrinaDePerfil = perfil => (perfil && DOCTRINAS[perfil.doctrina]) || null;
+// Cuánto Estado defiende, de 0 a 4: lo que haya elegido o, si no, lo que marque su doctrina.
+function nivelIntervencion(perfil) {
+  const D = doctrinaDePerfil(perfil), n = perfil ? +perfil.intervencion : NaN;
+  return Number.isInteger(n) && n >= 0 && n <= 4 ? n : D ? D.intervencion : 2;
+}
+// Qué leyes le gustan a un partido creado por un jugador: las de su doctrina, las que encajan con
+// su idea del Estado y las de sus causas.
+function afinidadPerfil(perfil) {
+  const D = doctrinaDePerfil(perfil), a = D ? { ...D.afinidad } : {};
+  if (D) {
+    const e = nivelIntervencion(perfil) - 2;
+    if (e) { a.estatal = e; a.mercado = -e; }
+  }
+  for (const t of perfil.principios || []) {
+    if (!PRINCIPIOS[t]) continue;
+    a[t] = 2;
+    if (PRINCIPIOS[t].opuesto) a[PRINCIPIOS[t].opuesto] = -2;
+  }
+  return a;
+}
+// Su tirón en cada grupo de votantes (1 es lo normal).
+function tironPerfil(perfil) {
+  const D = doctrinaDePerfil(perfil), e = D ? nivelIntervencion(perfil) - 2 : 0, m = {};
+  for (const g in GRUPOS) {
+    let v = 1 + ((D && D.grupos[g]) || 0);
+    for (const t of perfil.principios || []) v += (PRINCIPIOS[t] && PRINCIPIOS[t].grupos[g]) || 0;
+    // Cuanto más Estado defiende, más gusta a los obreros y menos a los empresarios.
+    if (g === 'obreros') v += e * 0.06;
+    if (g === 'empresarios') v -= e * 0.12;
+    m[g] = Math.max(0.2, v);
+  }
+  return m;
+}
+// Dónde se sienta en el hemiciclo.
+function ejePerfil(perfil) {
+  const D = doctrinaDePerfil(perfil), causas = perfil.principios || [];
+  if (!D) return ejeDePrincipios(causas);
+  return limitar(D.eje + (D.intervencion - nivelIntervencion(perfil)) * 0.2 + ejeDePrincipios(causas) * 0.25, -2, 2);
+}
 const PLANTILLA_JUGADOR = {
   nombre: 'Partido', siglas: 'P', color: '#888888', emblema: 'estrella', lema: '', eje: 0,
   afinidad: {}, base: { obreros: 20, empresarios: 20, campesinos: 20, jovenes: 20 },
@@ -74,8 +124,8 @@ function activarPartidos(s) {
     PARTIDOS[id] = { ...(CATALOGO_PARTIDOS[id] || PLANTILLA_JUGADOR) };
     const o = s && s.oposicion && s.oposicion.find(x => x.partido === id);
     // Los partidos propios de los jugadores se sientan según sus ideas.
-    if (s && id === huecoDe(s.config) && s.config.propio) PARTIDOS[id].eje = ejeDePrincipios(s.config.principios);
-    else if (o && o.perfil.propio) PARTIDOS[id].eje = ejeDePrincipios(o.perfil.principios || []);
+    if (s && id === huecoDe(s.config) && s.config.propio) PARTIDOS[id].eje = ejePerfil(s.config);
+    else if (o && o.perfil.propio) PARTIDOS[id].eje = ejePerfil(o.perfil);
   }
   ORDEN_HEMICICLO.length = 0;
   ORDEN_HEMICICLO.push(...ids.slice().sort((a, b) => PARTIDOS[a].eje - PARTIDOS[b].eje));
@@ -151,6 +201,8 @@ function crearNacion(cfg, pid, comun, partidos) {
     tropas: TROPAS_INICIALES, guerras: {}, batallas: [], anexiones: [], mapaVersion: 0,
     impuestos: 'normales', tributos: [], propuestas: [], oposicion: [], tokenGobierno: null, lideres: lideresAlAzar(cfg.lider),
     partidos: partidos || elegirPartidos(cfg.nPartidos, [huecoDe(cfg)]), sospecha: 0, corrupcion: {}, directiva: null, caida: null,
+    // modelo: cuánto interviene el Estado en la economía (ver MODELOS). Se empieza con el que defiende tu partido.
+    modelo: ORDEN_MODELOS[nivelIntervencion(perfilDeGobierno(cfg))], modeloMes: -99, pleno: null, sucesos: [],
     duenos: comun.duenos, ocupadas: comun.ocupadas, mundo: comun.mundo,
     cuenta: { obras: 0, leyes: 0, elecciones: 0, plenos: 0, propuestas: 0, conquistas: 0 },
     propuesta: null, votacion: null, resultadoVoto: null, evento: null, congreso: null, elecciones: null, fin: null, ultimaLey: null,
@@ -224,8 +276,18 @@ function guardar(s) { try { localStorage.setItem(GUARDADO, JSON.stringify(s)); }
 function cargar() {
   try {
     const s = JSON.parse(localStorage.getItem(GUARDADO));
-    return s && s.v === VERSION_GUARDADO ? s : null;
+    return s && (s.v === VERSION_GUARDADO || s.v === 6) ? migrarNacion(s) : null;
   } catch (e) { return null; }
+}
+// Pone al día una nación guardada con la versión anterior del juego.
+function migrarNacion(s) {
+  if (s.modelo === undefined) s.modelo = 'mixta';
+  if (s.modeloMes === undefined) s.modeloMes = -99;
+  if (s.pleno === undefined) s.pleno = null;
+  if (!s.sucesos) s.sucesos = [];
+  for (const id in s.leyes) if (!LEY_POR_ID[id]) delete s.leyes[id];
+  s.v = VERSION_GUARDADO;
+  return s;
 }
 function borrarGuardado() { try { localStorage.removeItem(GUARDADO); } catch (e) { /* sin almacenamiento */ } }
 
@@ -246,25 +308,25 @@ function siglasDe(nombre) {
   return sig.length >= 2 ? sig : (limpio.slice(0, 2).toUpperCase() || 'TP');
 }
 
-// Los principios de un partido creado por un jugador (el del gobierno o uno de la oposición); null si no lo es.
-function principiosDe(s, pid) {
+// El perfil de un partido creado por un jugador (el del gobierno o uno de la oposición); null si no lo es.
+function perfilPropio(s, pid) {
   if (!s) return null;
-  if (pid === ID_JUGADOR) return s.config.propio ? s.config.principios : null;
+  if (pid === ID_JUGADOR) return s.config.propio ? s.config : null;
   const o = opositorDe(s, pid);
-  return o && o.perfil.propio ? o.perfil.principios : null;
+  return o && o.perfil.propio ? o.perfil : null;
 }
 
-// Qué tipos de ley le gustan a un partido. Los creados por jugadores, según sus principios.
+// Qué tipos de ley le gustan a un partido. Los creados por jugadores, según su ideario.
 function afinidadDe(s, pid) {
-  const principios = principiosDe(s, pid);
-  if (!principios) return PARTIDOS[pid].afinidad;
-  const a = {};
-  for (const t of principios) {
-    a[t] = 2;
-    if (PRINCIPIOS[t].opuesto) a[PRINCIPIOS[t].opuesto] = -2;
-  }
-  return a;
+  const perfil = perfilPropio(s, pid);
+  return perfil ? afinidadPerfil(perfil) : PARTIDOS[pid].afinidad;
 }
+
+// Quien define al partido de un jugador: él mismo si lo creó, o el partido del catálogo al que se unió.
+const perfilDeGobierno = cfg => (cfg.propio ? cfg : CATALOGO_PARTIDOS[cfg.partidoId] || {});
+// La doctrina del partido que gobierna y la ventaja que le da mientras está en el poder.
+const doctrinaGobierno = s => doctrinaDePerfil(perfilDeGobierno(s.config));
+const rasgoGobierno = s => { const D = doctrinaGobierno(s); return s.modo === 'gobierno' && D ? D.rasgo : null; };
 const ideologiaLey = (afinidad, ley, derogar) => ley.tags.reduce((a, t) => a + (afinidad[t] || 0), 0) * (derogar ? -1 : 1);
 // Lo que tu partido piensa de una ley: positivo si encaja con sus ideas, negativo si las contradice.
 const opinionPartido = (s, leyId, derogar) => ideologiaLey(afinidadDe(s, ID_JUGADOR), LEY_POR_ID[leyId], derogar);
@@ -296,11 +358,9 @@ const mediaBase = base => Object.keys(GRUPOS).reduce((a, g) => a + GRUPOS[g].pes
 // Tirón de un partido en cada grupo cuando su apoyo es 50. Los creados por jugadores, según sus
 // principios; el del gobierno, ajustado para que la media sea siempre 33.
 function baseDe(s, pid) {
-  const principios = principiosDe(s, pid), m = {};
-  for (const g in GRUPOS) {
-    m[g] = principios ? Math.max(0.2, 1 + principios.reduce((a, t) => a + (PRINCIPIOS[t].grupos[g] || 0), 0)) : PARTIDOS[pid].base[g];
-  }
-  if (principios || pid === ID_JUGADOR) {
+  const perfil = perfilPropio(s, pid), tiron = perfil ? tironPerfil(perfil) : null, m = {};
+  for (const g in GRUPOS) m[g] = tiron ? tiron[g] : PARTIDOS[pid].base[g];
+  if (perfil || pid === ID_JUGADOR) {
     const k = 33 / mediaBase(m);
     for (const g in GRUPOS) m[g] *= k;
   }
@@ -343,6 +403,8 @@ function destituir(s, cartera) {
 function relacionPartido(s, pid) {
   let n = s.relPartidos[pid];
   for (const id of Object.values(s.ministros)) if (id && CAND_POR_ID[id].partido === pid) n += 12;
+  const rasgo = rasgoGobierno(s);
+  if (rasgo && rasgo.relPartidos) n += rasgo.relPartidos;
   return limitar(n, -100, 100);
 }
 
@@ -364,16 +426,36 @@ function influencia(s) {
     n += (p.tratado ? 10 : 0) + (p.alianza ? 20 : 0);
     rel += p.relacion;
   }
-  return Math.round(n + Math.max(0, rel / (vivos.length || 1)) / 4 + nivelMinistro(s, 'exteriores') * 2);
+  return Math.round(n + Math.max(0, rel / (vivos.length || 1)) / 4 + nivelMinistro(s, 'exteriores') * 2 + modsPoliticos(s).influencia);
 }
 
-// Todo lo que multiplica la economía: leyes, edificios especiales, ministros e influencia.
-function modsGlobales(s) {
-  const m = { fabricas: 1, minas: 1, export: 1, construccion: 1, impuestos: 1, granjaExtra: 0 };
-  for (const ley of LEYES) {
-    if (!s.leyes[ley.id] || !ley.mods) continue;
-    for (const k in ley.mods) m[k] = k === 'granjaExtra' ? m[k] + ley.mods[k] : m[k] * ley.mods[k];
+// Añade a m los modificadores de una ley, de un modelo económico o de una doctrina.
+function sumarMods(m, mods) {
+  for (const k in mods || {}) m[k] = MODS_QUE_SUMAN[k] ? m[k] + mods[k] : m[k] * mods[k];
+  return m;
+}
+const modsNeutros = () => ({
+  fabricas: 1, minas: 1, export: 1, construccion: 1, impuestos: 1, mercados: 1, turismo: 1, admin: 1, reclutar: 1, prensa: 1,
+  granjaExtra: 0, capacidad: 0, cpMes: 0, influencia: 0,
+});
+// Lo que cambian las decisiones políticas: las leyes en vigor y, cuando gobiernas, el modelo
+// económico y la doctrina de tu partido.
+function modsPoliticos(s) {
+  const m = modsNeutros();
+  for (const ley of LEYES) if (s.leyes[ley.id]) sumarMods(m, ley.mods);
+  if (s.modo === 'gobierno') {
+    sumarMods(m, MODELOS[s.modelo || 'mixta'].mods);
+    const rasgo = rasgoGobierno(s);
+    if (rasgo) sumarMods(m, rasgo.mods);
   }
+  return m;
+}
+// Capital político que recuperas cada mes.
+const cpAlMes = s => 2 + (s.modo === 'gobierno' ? modsPoliticos(s).cpMes : 0);
+
+// Todo lo que multiplica la economía: política, edificios especiales, ministros e influencia.
+function modsGlobales(s) {
+  const m = modsPoliticos(s);
   const t = contarEdificios(s);
   m.export *= (1 + Math.min(3, t.puerto) * 0.1) * (1 + influencia(s) * 0.003);
   m.fabricas *= 1 + Math.min(3, t.universidad) * 0.05;
@@ -403,15 +485,15 @@ function calcularEconomia(s) {
   // Mercados, turismo, intereses y tributos.
   let mercados = 0;
   for (const p of provinciasLibres(s)) if (s.edificios[p.id].mercado) mercados += 6 + p.pob / 60;
-  add(`Mercados (${t.mercado})`, mercados);
-  add(`Turismo (${t.hotel} ${t.hotel === 1 ? 'hotel' : 'hoteles'})`, t.hotel * ingresoHotel(s));
+  add(`Mercados (${t.mercado})`, mercados * m.mercados);
+  add(`Turismo (${t.hotel} ${t.hotel === 1 ? 'hotel' : 'hoteles'})`, t.hotel * ingresoHotel(s) * m.turismo);
   if (t.banco) add('Intereses del banco', Math.min(40, Math.max(0, s.dinero) * 0.015));
   for (const tr of s.tributos) add(`Tributo de ${PAISES[tr.pais].nombre} (${tr.meses} meses más)`, tr.cantidad);
   for (const pid of paisesVivos(s)) {
     if (s.paises[pid].tratado) add(`Tratado comercial con ${PAISES[pid].nombre}`, PAISES[pid].comercio);
     if (hayEmbargo(s, pid)) add(`${s.guerras[pid] ? 'Bloqueo' : 'Embargo'} de ${PAISES[pid].nombre}`, -20);
   }
-  add('Administración del Estado', -dificultad(s).admin);
+  add('Administración del Estado', -dificultad(s).admin * m.admin);
   let mant = 0;
   for (const k in EDIFICIOS) mant += t[k] * EDIFICIOS[k].mant;
   add('Mantenimiento de edificios', -mant);
@@ -440,6 +522,28 @@ function cambiarImpuestos(s, nivel) {
   s.cp -= 1;
   s.impuestos = nivel;
   noticia(s, `El gobierno pone los impuestos en nivel «${NIVELES_IMPUESTOS[nivel].nombre.toLowerCase()}».`);
+}
+
+// ---------- Modelo económico ----------
+// Cuánto interviene el Estado. Cada partido defiende un nivel: gobernar con otro desgasta ante los votantes.
+
+const nivelModelo = s => Math.max(0, ORDEN_MODELOS.indexOf(s.modelo || 'mixta'));
+const nivelIdeal = s => nivelIntervencion(perfilDeGobierno(s.config));
+const distanciaModelo = s => Math.abs(nivelModelo(s) - nivelIdeal(s));
+
+function puedeCambiarModelo(s, id) {
+  if (!MODELOS[id] || (s.modelo || 'mixta') === id) return { ok: false };
+  const espera = (s.modeloMes === undefined ? -99 : s.modeloMes) + MESES_ENTRE_MODELOS - s.mes;
+  if (espera > 0) return { ok: false, motivo: `Hay que esperar ${espera} ${espera === 1 ? 'mes' : 'meses'}` };
+  if (s.cp < CP_CAMBIAR_MODELO) return { ok: false, motivo: 'Sin capital político' };
+  return { ok: true };
+}
+function cambiarModelo(s, id) {
+  if (!puedeCambiarModelo(s, id).ok) return;
+  s.cp -= CP_CAMBIAR_MODELO;
+  s.modelo = id;
+  s.modeloMes = s.mes;
+  noticia(s, `El gobierno cambia de modelo económico: ${MODELOS[id].nombre.toLowerCase()}.`);
 }
 
 // ---------- Previsiones ----------
@@ -493,14 +597,14 @@ function previsionEdificio(s, provId, tipo) {
 
 // Dinero al mes que aporta (o cuesta) una ley mientras está en vigor, con la economía de hoy.
 function efectoDineroLey(s, leyId) {
-  const ley = LEY_POR_ID[leyId], inc = ley.incompatible, antes = s.leyes[leyId], antesInc = inc ? s.leyes[inc] : undefined;
-  if (inc) s.leyes[inc] = false;
+  const chocan = INCOMPATIBLES[leyId], antes = s.leyes[leyId], antesInc = chocan.map(id => s.leyes[id]);
+  for (const id of chocan) s.leyes[id] = false;
   s.leyes[leyId] = true;
   const con = calcularEconomia(s).balance;
   s.leyes[leyId] = false;
   const sin = calcularEconomia(s).balance;
   s.leyes[leyId] = antes;
-  if (inc) s.leyes[inc] = antesInc;
+  chocan.forEach((id, i) => { s.leyes[id] = antesInc[i]; });
   return con - sin;
 }
 
@@ -584,6 +688,10 @@ function objetivoGrupo(s, g) {
   add('Turismo', g === 'jovenes' ? Math.min(4, t.hotel) : 0);
   const imp = NIVELES_IMPUESTOS[s.impuestos];
   add(`Impuestos ${imp.nombre.toLowerCase()}`, imp.todos + ((imp.grupos || {})[g] || 0));
+  const M = MODELOS[s.modelo || 'mixta'], rasgo = rasgoGobierno(s);
+  add(M.nombre, (M.grupos || {})[g] || 0);
+  add('Tu partido defiende otro modelo económico', -2 * distanciaModelo(s));
+  if (rasgo && rasgo.grupos) add(`Doctrina: ${doctrinaGobierno(s).nombre.toLowerCase()}`, rasgo.grupos[g] || 0);
   add('Desgaste de gobernar', -Math.min(10, Math.floor((s.mes - s.inicioLegislatura) / dif.desgaste)));
   add('Cansancio de guerra', -cansancioGuerra(s));
   add('Provincias ocupadas por el enemigo', -3 * provinciasJugador().filter(p => s.ocupadas[p.id]).length);
@@ -609,6 +717,9 @@ function objetivoEstabilidad(s) {
   add('Ministro del Interior', 1.5 * nivelMinistro(s, 'interior'));
   add('País en guerra', -4 * Object.keys(s.guerras).length);
   add(`Impuestos ${NIVELES_IMPUESTOS[s.impuestos].nombre.toLowerCase()}`, NIVELES_IMPUESTOS[s.impuestos].estabilidad || 0);
+  add(MODELOS[s.modelo || 'mixta'].nombre, MODELOS[s.modelo || 'mixta'].estabilidad || 0);
+  const rasgo = rasgoGobierno(s);
+  if (rasgo) add(`Doctrina: ${doctrinaGobierno(s).nombre.toLowerCase()}`, rasgo.estabilidad || 0);
   add('Resistencia en las provincias anexionadas', -2 * anexionesRecientes(s).length);
   if (s.dinero < 0) add('Deuda pública', -10);
   return { valor: limitar(50 + razones.reduce((a, r) => a + r.v, 0)), razones };
@@ -637,12 +748,14 @@ function darMitin(s, g) {
 
 // ---------- Parlamento ----------
 
+// La ley en vigor que impide aprobar esta, si la hay.
+const leyQueChoca = (s, leyId) => INCOMPATIBLES[leyId].find(id => s.leyes[id]) || null;
+
 function puedeProponer(s, leyId, derogar) {
-  const ley = LEY_POR_ID[leyId];
   if (s.propuesta) return { ok: false, motivo: 'Ya hay una ley en trámite' };
-  if (!derogar && ley.incompatible && s.leyes[ley.incompatible]) {
-    return { ok: false, motivo: `Incompatible con «${LEY_POR_ID[ley.incompatible].nombre}»` };
-  }
+  if (s.pleno) return { ok: false, motivo: 'Hay una votación en marcha' };
+  const choca = !derogar && leyQueChoca(s, leyId);
+  if (choca) return { ok: false, motivo: `Incompatible con «${LEY_POR_ID[choca].nombre}»` };
   return { ok: true };
 }
 
@@ -655,23 +768,38 @@ function proponerLey(s, leyId, derogar) {
 // respaldo de la dirección. Si la ley es del gobierno, vota lo que se haya decidido (por defecto, se abstiene).
 const APOYO_PARA_RESPALDO = 40;
 function votoPartidoJugador(s, prop) {
+  // En un pleno con más jugadores vale lo que hayas votado tú.
+  if (prop.votos && prop.votos[ID_JUGADOR]) return prop.votos[ID_JUGADOR];
   if (prop.autor && prop.autor !== ID_JUGADOR) return prop.votoJugador || 'abs';
   if (s.modo === 'carrera' && s.carrera.cargo === 'diputado' && s.carrera.interno < APOYO_PARA_RESPALDO) return 'abs';
   return 'si';
 }
 
-// Cada partido vota en bloque. Quien propone la ley la apoya; los demás deciden por ideología y,
-// si la ley es tuya, también por su relación contigo y por lo que hayas negociado.
+// Lo que vota el grupo de un jugador de la oposición si él no dice nada: su consigna ante las leyes
+// del gobierno (apoyarlas o bloquearlas) o, si no tiene, lo que dicten las ideas de su partido.
+function votoPorDefecto(s, o, prop) {
+  const delGobierno = (prop.autor || ID_JUGADOR) === ID_JUGADOR;
+  if (delGobierno && o.postura === 'apoyar') return 'si';
+  if (delGobierno && o.postura === 'bloquear') return 'no';
+  const n = ideologiaLey(afinidadDe(s, o.partido), LEY_POR_ID[prop.ley], prop.derogar);
+  return n >= 1 ? 'si' : n <= -1 ? 'no' : 'abs';
+}
+
+// Cada partido vota en bloque. Quien propone la ley la apoya; los partidos de otros jugadores votan
+// lo que ellos decidan; los demás, por ideología y, si la ley es tuya, también por su relación
+// contigo y por lo que hayas negociado.
 function intencionVoto(s, prop) {
   const ley = LEY_POR_ID[prop.ley], autor = prop.autor || ID_JUGADOR, tuya = autor === ID_JUGADOR;
-  const r = { partidos: {}, si: 0, no: 0, abs: 0 };
+  const r = { partidos: {}, si: 0, no: 0, abs: 0 }, cero = { ideologia: 0, relacion: 0, negociado: 0, total: 0 };
   for (const pid in PARTIDOS) {
+    const o = opositorDe(s, pid);
     let d;
-    if (pid === ID_JUGADOR) d = { voto: votoPartidoJugador(s, prop), ideologia: 0, relacion: 0, negociado: 0, total: 0 };
-    else if (pid === autor) d = { voto: 'si', ideologia: 0, relacion: 0, negociado: 0, total: 0, autor: true };
-    else if (opositorDe(s, pid) && opositorDe(s, pid).postura !== 'ideas' && !opositorDe(s, autor)) {
-      // Un jugador de la oposición puede apoyar o bloquear todo lo que presente el gobierno.
-      d = { ideologia: 0, relacion: 0, negociado: 0, total: 0, voto: opositorDe(s, pid).postura === 'apoyar' ? 'si' : 'no', postura: true };
+    if (pid === ID_JUGADOR) d = { ...cero, voto: votoPartidoJugador(s, prop) };
+    else if (pid === autor) d = { ...cero, voto: 'si', autor: true };
+    else if (o) {
+      // Lo dirige otro jugador: vale su voto y, mientras no lo emita, lo que tenga previsto.
+      const emitido = prop.votos && prop.votos[pid];
+      d = { ...cero, voto: emitido || votoPorDefecto(s, o, prop), humano: true, emitido: !!emitido };
     } else {
       const ideologia = ideologiaLey(afinidadDe(s, pid), ley, prop.derogar);
       const relacion = tuya ? Math.round(relacionPartido(s, pid) / 40 * 10) / 10 : 0;
@@ -708,11 +836,98 @@ function costeVotar(s, prop = s.propuesta) {
 
 function votar(s) {
   const prop = s.propuesta;
-  if (!prop || s.cp < costeVotar(s)) return;
+  if (!prop || s.pleno || s.cp < costeVotar(s)) return;
   s.cp -= costeVotar(s);
   s.cuenta.propuestas++;
-  resolverVotacion(s, prop);
   s.propuesta = null;
+  // Si hay más jugadores en el parlamento, la ley no se vota sola: se abre un pleno y cada uno decide.
+  if (s.oposicion && s.oposicion.length) abrirPleno(s, prop);
+  else resolverVotacion(s, prop);
+}
+
+// ---------- Pleno con varios jugadores ----------
+// En un país compartido, cada votación queda abierta hasta que todos los jugadores con partido en
+// ese parlamento han decidido su voto (o hasta que acaba el mes). s.pleno guarda la propuesta, los
+// votos ya emitidos y los partidos que faltan. tipo: 'ley' o 'censura'.
+
+const partidosDeJugadores = s => [ID_JUGADOR, ...(s.oposicion || []).map(o => o.partido)];
+const hayPlenoPara = (s, pid) => !!(s.pleno && s.pleno.pendientes.includes(pid));
+
+function abrirPleno(s, prop) {
+  const autor = prop.autor || ID_JUGADOR;
+  // En una moción de censura al gobierno no se le pregunta: vota en contra.
+  const callan = prop.tipo === 'censura' ? [autor, ID_JUGADOR] : [autor];
+  s.pleno = { tipo: 'ley', ...prop, autor, mes: s.mes, votos: {}, pendientes: partidosDeJugadores(s).filter(pid => !callan.includes(pid)) };
+  if (!s.pleno.pendientes.length) cerrarPleno(s);
+}
+
+function votarEnPleno(s, pid, voto) {
+  const p = s.pleno;
+  if (!p || !p.pendientes.includes(pid) || !['si', 'no', 'abs'].includes(voto)) return false;
+  p.votos[pid] = voto;
+  p.pendientes = p.pendientes.filter(x => x !== pid);
+  if (!p.pendientes.length) cerrarPleno(s);
+  return true;
+}
+
+// Cierra el pleno con los votos que haya: quien no ha votado, vota lo que tuviera previsto.
+function cerrarPleno(s) {
+  const p = s.pleno;
+  if (!p) return;
+  s.pleno = null;
+  if (p.tipo === 'censura') resolverCensura(s, p); else resolverVotacion(s, p);
+}
+
+// El recuento lo ven todos los jugadores de ese parlamento.
+function publicarRecuento(s, v) {
+  s.resultadoVoto = v;
+  for (const o of s.oposicion || []) o.resultadoVoto = { ...v };
+}
+
+// Qué vota cada partido en una moción de censura: quien la presenta, a favor; el gobierno, en contra;
+// los demás jugadores, lo que decidan; y el resto, según se lleve con el gobierno y lo popular que sea.
+function intencionCensura(s, p) {
+  const r = { partidos: {}, si: 0, no: 0, abs: 0 }, pop = popularidad(s);
+  for (const pid in PARTIDOS) {
+    let voto, humano = false, emitido = true;
+    if (pid === p.autor) voto = 'si';
+    else if (pid === ID_JUGADOR) voto = 'no';
+    else if (opositorDe(s, pid)) {
+      humano = true;
+      emitido = !!(p.votos && p.votos[pid]);
+      voto = emitido ? p.votos[pid] : 'abs';
+    } else {
+      const n = -relacionPartido(s, pid) / 10 + (45 - pop) / 10;
+      voto = n >= 1 ? 'si' : n <= -1 ? 'no' : 'abs';
+    }
+    r.partidos[pid] = { voto, humano, emitido };
+    r[voto] += s.escanos[pid];
+  }
+  r.aprueba = r.si > r.no;
+  return r;
+}
+
+// Si la moción sale adelante, quien la presentó pasa a gobernar sin esperar a las elecciones.
+function resolverCensura(s, p) {
+  const r = intencionCensura(s, p), votos = {}, o = opositorDe(s, p.autor);
+  for (const pid in PARTIDOS) votos[pid] = r.partidos[pid].voto;
+  const v = { tipo: 'censura', autor: p.autor, si: r.si, no: r.no, abs: r.abs, aprueba: !!(r.aprueba && o), votos, escanos: { ...s.escanos } };
+  const quien = o ? o.perfil.lider : partidoInfo(s, p.autor).nombre;
+  if (v.aprueba) {
+    noticia(s, `La moción de censura de ${quien} sale adelante por ${r.si} votos a ${r.no}.`, 'mal');
+    v.relevo = { entra: quien, sale: s.config.lider };
+    cambiarGobierno(s, o);
+  } else {
+    noticia(s, `La moción de censura de ${quien} fracasa: ${r.si} a favor y ${r.no} en contra.`, 'bien');
+    s.estabilidad = limitar(s.estabilidad + 3);
+  }
+  publicarRecuento(s, v);
+}
+
+// Un suceso es un aviso que el jugador tiene que leer: por ejemplo, que otro le declara la guerra.
+function suceso(s, icono, titulo, texto) {
+  if (!s.sucesos) s.sucesos = [];
+  s.sucesos.push({ icono, titulo, texto });
 }
 
 // Celebra la votación de una ley, sea tuya o del partido que gobierna, y deja el resultado para mostrarlo.
@@ -729,7 +944,12 @@ function resolverVotacion(s, prop) {
       s.ultimaLey = { mes: s.mes, id: ley.id, derogar: prop.derogar, si: r.si, no: r.no };
     }
     noticia(s, r.aprueba ? `La oposición (${quien}) consigue ${que} por ${r.si} votos a ${r.no}.` : `${quien} no consigue ${que}.`, r.aprueba ? 'mal' : '');
-    s.resultadoVoto = { ley: ley.id, derogar: prop.derogar, autor, si: r.si, no: r.no, abs: r.abs, aprueba: r.aprueba, votos, escanos: { ...s.escanos } };
+    // Sacar adelante una ley mejora la imagen de quien la presentó ante quienes se benefician.
+    if (r.aprueba) {
+      const signo = prop.derogar ? -1 : 1;
+      for (const g in ley.grupos || {}) opo.imagen[g] = limitar(opo.imagen[g] + Math.round(ley.grupos[g] * signo / 3), -15, 15);
+    }
+    publicarRecuento(s, { tipo: 'ley', ley: ley.id, derogar: prop.derogar, autor, si: r.si, no: r.no, abs: r.abs, aprueba: r.aprueba, votos, escanos: { ...s.escanos } });
     return;
   }
   if (r.aprueba) {
@@ -748,7 +968,7 @@ function resolverVotacion(s, prop) {
   }
   if (tuya && s.modo === 'carrera') premioLeyCarrera(s, ley, prop.derogar, r.aprueba);
   if (s.modo === 'gobierno') revisarPromesas(s);
-  s.resultadoVoto = { ley: ley.id, derogar: prop.derogar, autor, si: r.si, no: r.no, abs: r.abs, aprueba: r.aprueba, votos, escanos: { ...s.escanos } };
+  publicarRecuento(s, { tipo: 'ley', ley: ley.id, derogar: prop.derogar, autor, si: r.si, no: r.no, abs: r.abs, aprueba: r.aprueba, votos, escanos: { ...s.escanos } });
 }
 
 // Qué parte de cada grupo social vota a cada partido (de 0 a 1).
@@ -918,7 +1138,10 @@ function responderPropuesta(s, i, acepta) {
   const otro = nacionDe(pr.de), yo = PAIS_JUGADOR.nombre, que = TEXTO_PROPUESTA[pr.tipo];
   if (!acepta) {
     noticia(s, `Rechazas ${que} que proponía ${pr.nombre}.`);
-    if (otro) noticia(otro, `${yo} rechaza ${que}.`, 'mal');
+    if (otro) {
+      noticia(otro, `${yo} rechaza ${que}.`, 'mal');
+      suceso(otro, 'bandera', `${yo} rechaza tu propuesta`, `Le ofreciste ${que} y ha dicho que no.`);
+    }
     return;
   }
   if (pr.tipo === 'paz') {
@@ -932,7 +1155,10 @@ function responderPropuesta(s, i, acepta) {
   if (otro) otro.paises[s.nacion][pr.tipo] = true;
   const hecho = pr.tipo === 'tratado' ? 'firman un tratado comercial' : 'sellan una alianza';
   noticia(s, `${yo} y ${pr.nombre} ${hecho}.`, 'bien');
-  if (otro) noticia(otro, `${pr.nombre} y ${yo} ${hecho}.`, 'bien');
+  if (otro) {
+    noticia(otro, `${pr.nombre} y ${yo} ${hecho}.`, 'bien');
+    suceso(otro, pr.tipo === 'tratado' ? 'moneda' : 'escudo', `${yo} acepta tu propuesta`, `Le ofreciste ${que} y ha dicho que sí: ya está en vigor.`);
+  }
 }
 
 // Los acuerdos se rompen si la relación se hunde. Con otros jugadores, solo si ellos quieren (la guerra).
@@ -1089,6 +1315,7 @@ function consejo(s) {
   if (faltan <= 5 && !ganaJugador(estimarVotos(s, false))) return { texto: 'Las encuestas no te dan ganador. Da mítines y aprueba algo popular.', tab: 'sociedad' };
   if (s.grupos[peor] < 40) return { texto: `Los ${GRUPOS[peor].nombre.toLowerCase()} están descontentos. Mira qué les molesta.`, tab: 'sociedad' };
   if (!numMinistros(s)) return { texto: 'Tu gabinete está vacío. Los ministros dan ventajas cada mes.', tab: 'gobierno' };
+  if (distanciaModelo(s) >= 2) return { texto: 'Gobiernas con un modelo económico muy lejos del que defiende tu partido, y tus votantes lo notan.', tab: 'economia' };
   if (s.cp >= 8) return { texto: 'Te sobra capital político. Propón una ley o envía una delegación.', tab: 'parlamento' };
   if (s.dinero >= 350 && !s.obras.length) return { texto: 'Hay dinero parado en el tesoro. Invertirlo en edificios da más ingresos.', tab: 'provincia' };
   return null;
@@ -1108,12 +1335,16 @@ function comprobarFin(s) {
 
 // Hay algo en pantalla que el jugador debe resolver antes de pasar de mes.
 const hayAlgoPendiente = s => !!(s.fin || s.evento || s.votacion || s.congreso || s.elecciones || s.caida || s.resultadoVoto
-  || s.batallas.length || s.propuestas.length);
+  || s.batallas.length || s.propuestas.length || (s.sucesos && s.sucesos.length) || hayPlenoPara(s, ID_JUGADOR));
 
 // En multijugador el mes avanza aunque alguien no haya contestado: se decide por él lo más prudente.
 function resolverPendientes(s) {
+  // Un pleno a medias se cierra con lo que haya, y los recuentos que nadie ha cerrado se retiran.
+  if (s.pleno) cerrarPleno(s);
+  for (const o of s.oposicion || []) o.resultadoVoto = null;
   for (let guardia = 0; hayAlgoPendiente(s) && !s.fin && guardia < 30; guardia++) {
     if (s.batallas.length) s.batallas = [];
+    else if (s.sucesos && s.sucesos.length) s.sucesos = [];
     else if (s.resultadoVoto) s.resultadoVoto = null;
     else if (s.propuestas.length) responderPropuesta(s, 0, false);
     else if (s.elecciones) { if (s.elecciones.carrera && s.elecciones.gana) formarGobierno(s); else s.elecciones = null; }
@@ -1185,7 +1416,7 @@ function mesNacionAntes(s) {
   s.prestamos = s.prestamos.map(m => m - 1).filter(m => m > 0);
   for (const g in GRUPOS) s.grupos[g] = Math.round(s.grupos[g] + (objetivoGrupo(s, g).valor - s.grupos[g]) * 0.25);
   s.estabilidad = Math.round(s.estabilidad + (objetivoEstabilidad(s).valor - s.estabilidad) * 0.25);
-  s.cp = Math.min(CP_MAXIMO, s.cp + 2);
+  s.cp = Math.min(CP_MAXIMO, s.cp + cpAlMes(s));
   for (const pid of paisesVivos(s)) {
     const p = s.paises[pid];
     if (!s.guerras[pid] && p.relacion !== p.base) p.relacion += p.relacion < p.base ? 1 : -1;

@@ -1,7 +1,7 @@
 'use strict';
 // Datos del juego: todo lo que se puede equilibrar o ampliar sin tocar las reglas.
 
-const VERSION = '1.0';
+const VERSION = '2.0';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const ANIO_INICIAL = 2030;
 const CP_MAXIMO = 10;
@@ -88,19 +88,213 @@ const GRUPOS = {
   jovenes: { nombre: 'Jóvenes', peso: 0.25, icono: 'birrete' },
 };
 
-const ETIQUETAS = { izquierda: 'Izquierda', derecha: 'Derecha', social: 'Social', orden: 'Orden', verde: 'Verde', agrario: 'Agrario' };
+const ETIQUETAS = {
+  izquierda: 'Izquierda', derecha: 'Derecha', social: 'Social', orden: 'Orden', verde: 'Verde', agrario: 'Agrario',
+  estatal: 'Estatismo', mercado: 'Mercado', nacional: 'Nación', libertad: 'Libertades', autoridad: 'Autoridad', tradicion: 'Tradición', global: 'Apertura',
+};
 
-// Principios que puede tener un partido creado por el jugador. Cada uno marca qué leyes le gustan
-// (afinidad +2) y entre qué grupos tiene más o menos tirón (grupos: cambio relativo de su base).
+// Causas que puede abrazar un partido creado por el jugador, además de su doctrina. Cada una marca
+// qué leyes le gustan (afinidad +2; −2 a las de su opuesto) y entre qué grupos tiene más o menos
+// tirón (grupos: cambio relativo de su base). oculto: ya no se elige (lo decide la doctrina), pero
+// sigue valiendo para las partidas guardadas con una versión anterior.
 const PRINCIPIOS = {
-  izquierda: { desc: 'Reparto de la riqueza y servicios públicos.', grupos: { obreros: 0.25, empresarios: -0.35, jovenes: 0.05 }, opuesto: 'derecha' },
-  derecha: { desc: 'Libre mercado e impuestos bajos.', grupos: { empresarios: 0.6, obreros: -0.2, campesinos: 0.05 }, opuesto: 'izquierda' },
+  izquierda: { desc: 'Reparto de la riqueza y servicios públicos.', grupos: { obreros: 0.25, empresarios: -0.35, jovenes: 0.05 }, opuesto: 'derecha', oculto: true },
+  derecha: { desc: 'Libre mercado e impuestos bajos.', grupos: { empresarios: 0.6, obreros: -0.2, campesinos: 0.05 }, opuesto: 'izquierda', oculto: true },
   social: { desc: 'Educación, vivienda y derechos.', grupos: { jovenes: 0.15, obreros: 0.1, empresarios: -0.1 } },
   orden: { desc: 'Seguridad, ejército y mano dura.', grupos: { campesinos: 0.15, empresarios: 0.15, jovenes: -0.25 } },
   verde: { desc: 'Medio ambiente y energía limpia.', grupos: { jovenes: 0.3, campesinos: 0.1, empresarios: -0.2 } },
   agrario: { desc: 'El campo y los pueblos primero.', grupos: { campesinos: 0.4, jovenes: -0.1 } },
+  nacional: { desc: 'La patria, sus fronteras y su ejército.', grupos: { campesinos: 0.1, obreros: 0.05, jovenes: -0.15 }, opuesto: 'global' },
+  global: { desc: 'Apertura al mundo y cooperación.', grupos: { jovenes: 0.15, empresarios: 0.1, campesinos: -0.15 }, opuesto: 'nacional' },
+  libertad: { desc: 'Libertades y derechos civiles.', grupos: { jovenes: 0.2, campesinos: -0.1 }, opuesto: 'autoridad' },
+  tradicion: { desc: 'Familia, fe y costumbres.', grupos: { campesinos: 0.2, jovenes: -0.2 } },
 };
 const MAX_PRINCIPIOS = 2;
+
+// Cuánto interviene el Estado en la economía, de 0 (nada) a 4 (todo). Es a la vez una idea de
+// partido (qué defiende) y una palanca de gobierno (el modelo económico en vigor, s.modelo).
+// mods multiplican la economía igual que los de las leyes; grupos y estabilidad cambian el apoyo.
+const MODELOS = {
+  minimo: {
+    nombre: 'Estado mínimo', desc: 'El Estado solo guarda el orden; todo lo demás lo hace el mercado.',
+    mods: { fabricas: 1.12, export: 1.05, impuestos: 0.8, admin: 0.8 }, grupos: { empresarios: 6, obreros: -6, campesinos: -3 }, estabilidad: -3,
+  },
+  liberal: {
+    nombre: 'Mercado libre', desc: 'Empresa privada con pocas trabas y servicios públicos básicos.',
+    mods: { fabricas: 1.06, impuestos: 0.95 }, grupos: { empresarios: 3, obreros: -2 },
+  },
+  mixta: { nombre: 'Economía mixta', desc: 'Mercado y Estado se reparten el trabajo. Ni ventajas ni costes.' },
+  dirigida: {
+    nombre: 'Economía dirigida', desc: 'El Estado marca el rumbo y controla los sectores clave.',
+    mods: { construccion: 0.9, minas: 1.08, fabricas: 0.96 }, grupos: { obreros: 3, empresarios: -4 },
+  },
+  planificada: {
+    nombre: 'Economía planificada', desc: 'El Estado decide qué se produce: mucha industria pesada y poco comercio.',
+    mods: { construccion: 0.75, minas: 1.2, fabricas: 0.92, export: 0.9, admin: 1.1 }, grupos: { obreros: 6, empresarios: -9 }, estabilidad: 3,
+  },
+};
+const ORDEN_MODELOS = Object.keys(MODELOS);
+const CP_CAMBIAR_MODELO = 2;
+const MESES_ENTRE_MODELOS = 6;
+
+const FAMILIAS_DOCTRINA = {
+  revolucionaria: 'Izquierda revolucionaria', izquierda: 'Izquierda', centro: 'Centro', derecha: 'Derecha', autoritaria: 'Nacionalismo autoritario',
+};
+
+// Doctrinas políticas entre las que elige quien crea un partido. Son las de la historia real,
+// contadas sin tomar partido: aquí solo son una forma de jugar.
+// eje: dónde se sienta en el hemiciclo (−2 izquierda, +2 derecha). intervencion: cuánto Estado
+// defiende de partida (0 a 4, ver MODELOS). afinidad: qué leyes le gustan (−2 a +2).
+// grupos: tirón entre los votantes. rasgo: ventaja mientras gobierna (mods, grupos, estabilidad, relPartidos).
+const DOCTRINAS = {
+  leninismo: {
+    nombre: 'Marxismo-leninismo', familia: 'revolucionaria', eje: -2, intervencion: 4,
+    desc: 'Partido único de vanguardia y economía planificada por el Estado.',
+    afinidad: { izquierda: 2, autoridad: 1, orden: 1, derecha: -2, libertad: -1, tradicion: -1 },
+    grupos: { obreros: 0.35, campesinos: 0.05, empresarios: -0.5 },
+    rasgo: { texto: 'Planes quinquenales: las minas rinden un 10% más y construir cuesta un 10% menos.', mods: { minas: 1.1, construccion: 0.9 } },
+  },
+  trotskismo: {
+    nombre: 'Trotskismo', familia: 'revolucionaria', eje: -2, intervencion: 4,
+    desc: 'Revolución obrera sin fronteras y sin burócratas.',
+    afinidad: { izquierda: 2, global: 2, social: 1, derecha: -2, nacional: -2, tradicion: -1 },
+    grupos: { obreros: 0.3, jovenes: 0.15, empresarios: -0.5 },
+    rasgo: { texto: 'Internacionalismo: tu influencia en el exterior sube 8 puntos.', mods: { influencia: 8 } },
+  },
+  maoismo: {
+    nombre: 'Maoísmo', familia: 'revolucionaria', eje: -2, intervencion: 4,
+    desc: 'La revolución empieza en el campo y la hacen los campesinos.',
+    afinidad: { izquierda: 2, agrario: 2, autoridad: 1, derecha: -2, libertad: -1, global: -1 },
+    grupos: { campesinos: 0.4, obreros: 0.15, jovenes: -0.05, empresarios: -0.5 },
+    rasgo: { texto: 'Revolución campesina: cada granja da 1 alimento más.', mods: { granjaExtra: 1 } },
+  },
+  anarquismo: {
+    nombre: 'Anarcosindicalismo', familia: 'revolucionaria', eje: -1.9, intervencion: 2,
+    desc: 'Ni patronos ni Estado: fábricas y campos en manos de los sindicatos.',
+    afinidad: { izquierda: 2, libertad: 2, social: 1, autoridad: -2, orden: -2, nacional: -1, tradicion: -1, derecha: -1 },
+    grupos: { obreros: 0.3, jovenes: 0.2, campesinos: -0.05, empresarios: -0.45 },
+    rasgo: { texto: 'Autogestión: las fábricas rinden un 8% más, pero la estabilidad baja 3.', mods: { fabricas: 1.08 }, estabilidad: -3 },
+  },
+  socialismo: {
+    nombre: 'Socialismo democrático', familia: 'izquierda', eje: -1.5, intervencion: 3,
+    desc: 'Empresas públicas y reparto de la riqueza, siempre por las urnas.',
+    afinidad: { izquierda: 2, social: 2, derecha: -2 },
+    grupos: { obreros: 0.3, jovenes: 0.05, empresarios: -0.35 },
+    rasgo: { texto: 'Servicios públicos: los obreros te apoyan 3 puntos más.', grupos: { obreros: 3 } },
+  },
+  socialismo_mercado: {
+    nombre: 'Socialismo de mercado', familia: 'izquierda', eje: -1.2, intervencion: 3,
+    desc: 'El Estado manda en la economía, pero sus empresas compiten y exportan.',
+    afinidad: { izquierda: 1, global: 1, autoridad: 1, libertad: -1 },
+    grupos: { obreros: 0.15, empresarios: 0.05, jovenes: -0.1 },
+    rasgo: { texto: 'Empresas públicas competitivas: las exportaciones rinden un 8% más.', mods: { export: 1.08 } },
+  },
+  socialdemocracia: {
+    nombre: 'Socialdemocracia', familia: 'izquierda', eje: -1, intervencion: 2,
+    desc: 'Capitalismo con impuestos altos y un Estado del bienestar fuerte.',
+    afinidad: { izquierda: 1, social: 2, libertad: 1, derecha: -1, autoridad: -1 },
+    grupos: { obreros: 0.2, jovenes: 0.1, empresarios: -0.15 },
+    rasgo: { texto: 'Pacto social: la estabilidad sube 4 puntos.', estabilidad: 4 },
+  },
+  ecologismo: {
+    nombre: 'Ecologismo político', familia: 'izquierda', eje: -0.9, intervencion: 3,
+    desc: 'El planeta primero: menos crecimiento y más cuidado del entorno.',
+    afinidad: { verde: 2, social: 1, libertad: 1, izquierda: 1, derecha: -1 },
+    grupos: { jovenes: 0.35, campesinos: 0.1, empresarios: -0.25 },
+    rasgo: { texto: 'Economía verde: los jóvenes te apoyan 3 puntos más y el turismo rinde un 15% más.', grupos: { jovenes: 3 }, mods: { turismo: 1.15 } },
+  },
+  progresismo: {
+    nombre: 'Progresismo', familia: 'izquierda', eje: -0.5, intervencion: 2,
+    desc: 'Derechos civiles, igualdad y una sociedad abierta.',
+    afinidad: { social: 2, libertad: 2, global: 1, tradicion: -2, autoridad: -1, orden: -1 },
+    grupos: { jovenes: 0.3, obreros: 0.05, campesinos: -0.15 },
+    rasgo: { texto: 'Sociedad abierta: los jóvenes te apoyan 4 puntos más.', grupos: { jovenes: 4 } },
+  },
+  centrismo: {
+    nombre: 'Centrismo', familia: 'centro', eje: 0, intervencion: 2,
+    desc: 'Reformas tranquilas y pactos con unos y con otros.',
+    afinidad: { libertad: 1 }, grupos: {},
+    rasgo: { texto: 'Pactista: tu relación con los demás partidos es 10 puntos mejor.', relPartidos: 10 },
+  },
+  tecnocracia: {
+    nombre: 'Tecnocracia', familia: 'centro', eje: 0.2, intervencion: 2,
+    desc: 'Que gobiernen los expertos, con números y sin ideología.',
+    afinidad: { global: 1, orden: 1 },
+    grupos: { empresarios: 0.15, jovenes: 0.05, campesinos: -0.1 },
+    rasgo: { texto: 'Gestión experta: construir cuesta un 8% menos y los impuestos rinden un 4% más.', mods: { construccion: 0.92, impuestos: 1.04 } },
+  },
+  regionalismo: {
+    nombre: 'Regionalismo', familia: 'centro', eje: 0.3, intervencion: 2,
+    desc: 'Las provincias se gobiernan mejor desde cerca que desde la capital.',
+    afinidad: { agrario: 2, libertad: 1, tradicion: 1, nacional: -1 },
+    grupos: { campesinos: 0.3, jovenes: -0.05 },
+    rasgo: { texto: 'Cercanía: la administración del Estado cuesta un 10% menos.', mods: { admin: 0.9 } },
+  },
+  agrarismo: {
+    nombre: 'Agrarismo', familia: 'centro', eje: 0.4, intervencion: 2,
+    desc: 'La riqueza del país está en su tierra y en quien la trabaja.',
+    afinidad: { agrario: 2, tradicion: 1, verde: 1 },
+    grupos: { campesinos: 0.45, jovenes: -0.1, empresarios: -0.05 },
+    rasgo: { texto: 'Raíces: los campesinos te apoyan 4 puntos más.', grupos: { campesinos: 4 } },
+  },
+  democristiana: {
+    nombre: 'Democracia cristiana', familia: 'derecha', eje: 0.6, intervencion: 2,
+    desc: 'Valores religiosos, familia y una economía con rostro humano.',
+    afinidad: { tradicion: 2, social: 1, agrario: 1, orden: 1 },
+    grupos: { campesinos: 0.25, empresarios: 0.1, jovenes: -0.15 },
+    rasgo: { texto: 'Paz social: la estabilidad sube 2 puntos y los campesinos te apoyan 2 más.', estabilidad: 2, grupos: { campesinos: 2 } },
+  },
+  liberalismo: {
+    nombre: 'Liberalismo', familia: 'derecha', eje: 1, intervencion: 1,
+    desc: 'Capitalismo liberal: propiedad privada, libre mercado y libertades individuales.',
+    afinidad: { derecha: 2, libertad: 2, global: 1, izquierda: -2, autoridad: -1, nacional: -1 },
+    grupos: { empresarios: 0.6, jovenes: 0.05, obreros: -0.2 },
+    rasgo: { texto: 'Clima de negocios: las fábricas rinden un 8% más.', mods: { fabricas: 1.08 } },
+  },
+  libertarismo: {
+    nombre: 'Libertarismo', familia: 'derecha', eje: 1.4, intervencion: 0,
+    desc: 'Cuanto menos Estado, mejor: ni impuestos ni normas.',
+    afinidad: { derecha: 2, libertad: 2, izquierda: -2, autoridad: -2, orden: -1, social: -1 },
+    grupos: { empresarios: 0.7, jovenes: 0.05, obreros: -0.3 },
+    rasgo: { texto: 'Estado adelgazado: la administración cuesta un 20% menos, pero la estabilidad baja 3.', mods: { admin: 0.8 }, estabilidad: -3 },
+  },
+  conservadurismo: {
+    nombre: 'Conservadurismo', familia: 'derecha', eje: 1.5, intervencion: 1,
+    desc: 'Orden, propiedad y respeto a lo que siempre ha funcionado.',
+    afinidad: { derecha: 2, orden: 2, tradicion: 2, nacional: 1, izquierda: -2, social: -1 },
+    grupos: { empresarios: 0.4, campesinos: 0.2, obreros: -0.1, jovenes: -0.25 },
+    rasgo: { texto: 'Ley y orden: la estabilidad sube 4 puntos.', estabilidad: 4 },
+  },
+  nacionalismo: {
+    nombre: 'Nacionalismo', familia: 'derecha', eje: 1.8, intervencion: 2,
+    desc: 'La nación por encima de todo: fronteras firmes y ejército fuerte.',
+    afinidad: { nacional: 2, orden: 2, tradicion: 1, global: -2, libertad: -1 },
+    grupos: { campesinos: 0.2, obreros: 0.1, jovenes: -0.2 },
+    rasgo: { texto: 'Patria: reclutar un regimiento cuesta un 20% menos.', mods: { reclutar: 0.8 } },
+  },
+  tradicionalismo: {
+    nombre: 'Tradicionalismo', familia: 'derecha', eje: 1.9, intervencion: 2,
+    desc: 'Trono, altar y costumbres: la vieja sociedad de siempre.',
+    afinidad: { tradicion: 2, orden: 2, agrario: 1, libertad: -1, social: -1, global: -1 },
+    grupos: { campesinos: 0.35, jovenes: -0.3 },
+    rasgo: { texto: 'Trono y altar: la estabilidad sube 3 puntos y los campesinos te apoyan 2 más.', estabilidad: 3, grupos: { campesinos: 2 } },
+  },
+  falangismo: {
+    nombre: 'Falangismo', familia: 'autoritaria', eje: 2, intervencion: 3,
+    desc: 'Nacionalsindicalismo: nación, Estado fuerte y sindicato único de obreros y patronos.',
+    afinidad: { nacional: 2, autoridad: 2, tradicion: 2, orden: 1, social: 1, libertad: -2, global: -2, derecha: -1 },
+    grupos: { campesinos: 0.2, obreros: 0.15, empresarios: -0.1, jovenes: -0.2 },
+    rasgo: { texto: 'Sindicato vertical: las fábricas rinden un 6% más y la estabilidad sube 2.', mods: { fabricas: 1.06 }, estabilidad: 2 },
+  },
+  fascismo: {
+    nombre: 'Fascismo', familia: 'autoritaria', eje: 2, intervencion: 3,
+    desc: 'Nacionalismo extremo, un solo jefe y toda la sociedad al servicio del Estado.',
+    afinidad: { nacional: 2, autoridad: 2, orden: 2, libertad: -2, global: -2, social: -1 },
+    grupos: { obreros: 0.1, campesinos: 0.1, empresarios: 0.1, jovenes: -0.3 },
+    rasgo: { texto: 'Movilización total: caben 2 regimientos más y reclutar cuesta un 15% menos.', mods: { capacidad: 2, reclutar: 0.85 } },
+  },
+};
+const DOCTRINA_BASE = 'centrismo';
 
 // afinidad: cuánto le gusta a cada partido cada tipo de ley (-2 a +2). base: fuerza electoral por grupo.
 // eje: dónde se sienta en el hemiciclo, de izquierda (-2) a derecha (+2).
@@ -109,41 +303,49 @@ const MAX_PRINCIPIOS = 2;
 const CATALOGO_PARTIDOS = {
   uc: {
     nombre: 'Unión Cívica', siglas: 'UC', color: '#c9902b', emblema: 'sol', lema: 'Centro moderado y pactista.', eje: 0,
+    doctrina: 'centrismo', intervencion: 2,
     afinidad: {}, base: { obreros: 30, empresarios: 30, campesinos: 30, jovenes: 30 },
   },
   fo: {
     nombre: 'Frente Obrero', siglas: 'FO', color: '#b5443b', emblema: 'engranaje', lema: 'Izquierda sindical, fuerte entre los obreros.', eje: -2,
-    afinidad: { izquierda: 2, social: 1, derecha: -2, orden: -1 },
+    doctrina: 'socialismo', intervencion: 3,
+    afinidad: { izquierda: 2, social: 1, estatal: 2, derecha: -2, mercado: -2, orden: -1 },
     base: { obreros: 45, empresarios: 4, campesinos: 18, jovenes: 28 },
   },
   ac: {
     nombre: 'Alianza Conservadora', siglas: 'AC', color: '#35568c', emblema: 'torre', lema: 'Derecha de orden, la preferida de los empresarios.', eje: 1.6,
-    afinidad: { derecha: 2, orden: 2, izquierda: -2, social: -1, verde: -1, agrario: 1 },
+    doctrina: 'conservadurismo', intervencion: 1,
+    afinidad: { derecha: 2, orden: 2, tradicion: 2, mercado: 1, nacional: 1, agrario: 1, izquierda: -2, social: -1, verde: -1, estatal: -1 },
     base: { obreros: 14, empresarios: 55, campesinos: 28, jovenes: 10 },
   },
   va: {
     nombre: 'Verdes Agrarios', siglas: 'VA', color: '#4f8a4b', emblema: 'hoja', lema: 'Ecologistas del campo, pequeños pero decisivos.', eje: -0.8,
-    afinidad: { verde: 2, agrario: 2, social: 1, derecha: -1 },
+    doctrina: 'ecologismo', intervencion: 2,
+    afinidad: { verde: 2, agrario: 2, social: 1, libertad: 1, derecha: -1 },
     base: { obreros: 5, empresarios: 5, campesinos: 20, jovenes: 22 },
   },
   pl: {
     nombre: 'Partido Liberal', siglas: 'PL', color: '#d8b13a', emblema: 'balanza', lema: 'Mercado libre y libertades. Fuerte en las ciudades.', eje: 0.9,
-    afinidad: { derecha: 2, social: 1, orden: -1, izquierda: -1 },
+    doctrina: 'liberalismo', intervencion: 1,
+    afinidad: { derecha: 2, mercado: 2, libertad: 2, social: 1, global: 1, orden: -1, izquierda: -1, estatal: -2, autoridad: -2 },
     base: { obreros: 6, empresarios: 26, campesinos: 4, jovenes: 16 },
   },
   mn: {
     nombre: 'Movimiento Nacional', siglas: 'MN', color: '#4a4f5c', emblema: 'escudo', lema: 'Mano dura y patria primero. Crece cuando hay crisis.', eje: 2,
-    afinidad: { orden: 2, agrario: 1, social: -2, verde: -1, izquierda: -1 },
+    doctrina: 'nacionalismo', intervencion: 2,
+    afinidad: { orden: 2, nacional: 2, autoridad: 1, tradicion: 1, agrario: 1, social: -2, global: -2, verde: -1, izquierda: -1, libertad: -1 },
     base: { obreros: 12, empresarios: 8, campesinos: 14, jovenes: 7 },
   },
   ms: {
     nombre: 'Marea Social', siglas: 'MS', color: '#a8478f', emblema: 'megafono', lema: 'Nueva izquierda joven: vivienda, derechos y clima.', eje: -1.4,
-    afinidad: { social: 2, verde: 1, izquierda: 1, orden: -2 },
+    doctrina: 'progresismo', intervencion: 2,
+    afinidad: { social: 2, libertad: 2, verde: 1, izquierda: 1, global: 1, orden: -2, autoridad: -2, tradicion: -1 },
     base: { obreros: 10, empresarios: 2, campesinos: 3, jovenes: 24 },
   },
   pr: {
     nombre: 'Partido Regionalista', siglas: 'PR', color: '#2f8c8c', emblema: 'faro', lema: 'Defiende las provincias frente a la capital.', eje: 0.3,
-    afinidad: { agrario: 2, social: 1 },
+    doctrina: 'regionalismo', intervencion: 2,
+    afinidad: { agrario: 2, social: 1, tradicion: 1 },
     base: { obreros: 8, empresarios: 6, campesinos: 16, jovenes: 6 },
   },
 };
@@ -179,34 +381,73 @@ const NIVELES_IMPUESTOS = {
 };
 const MESES_TRIBUTO = 24;
 
-const CATEGORIAS_LEY = { economia: 'Economía', trabajo: 'Trabajo', social: 'Social', orden: 'Orden', ambiente: 'Campo y ambiente' };
+const CATEGORIAS_LEY = { economia: 'Economía', trabajo: 'Trabajo', social: 'Social', orden: 'Orden', estado: 'Estado y nación', ambiente: 'Campo y ambiente' };
 
 // coste: gasto mensual (negativo = ingreso). grupos: cambio de apoyo mientras la ley esté en vigor.
-// mods: fabricas/minas/export/construccion/impuestos multiplican; granjaExtra suma alimentos por granja.
+// mods multiplican: fabricas, minas, export, construccion, impuestos, mercados, turismo, admin (gasto
+// de administración), reclutar (precio de un regimiento) y prensa (riesgo de que destapen un escándalo).
+// Y suman: granjaExtra (alimentos por granja), capacidad (regimientos que caben), cpMes (capital
+// político al mes) e influencia. incompatible: leyes que no pueden estar en vigor a la vez que esta.
+const MODS_QUE_SUMAN = { granjaExtra: 1, capacidad: 1, cpMes: 1, influencia: 1 };
 const LEYES = [
-  { id: 'impuestos', cat: 'economia', nombre: 'Subida de impuestos', desc: 'Más recaudación a costa de quien más tiene.', tags: ['izquierda'], mods: { impuestos: 1.5 }, grupos: { empresarios: -10, jovenes: -3 }, incompatible: 'rebaja' },
-  { id: 'rebaja', cat: 'economia', nombre: 'Rebaja fiscal', desc: 'Menos impuestos para animar la inversión.', tags: ['derecha'], mods: { impuestos: 0.7, fabricas: 1.15 }, grupos: { empresarios: 10, obreros: 2 }, incompatible: 'impuestos' },
-  { id: 'comercio', cat: 'economia', nombre: 'Libre comercio', desc: 'Se eliminan aranceles: lo que exportas se paga mejor.', tags: ['derecha'], mods: { export: 1.2 }, grupos: { empresarios: 8, campesinos: -6 }, incompatible: 'aranceles' },
-  { id: 'aranceles', cat: 'economia', nombre: 'Aranceles proteccionistas', desc: 'Se protege el producto nacional frente al extranjero.', tags: ['izquierda', 'agrario'], mods: { export: 0.9 }, grupos: { campesinos: 8, obreros: 4, empresarios: -6 }, incompatible: 'comercio' },
-  { id: 'privatizacion', cat: 'economia', nombre: 'Privatización de servicios', desc: 'El Estado vende empresas públicas y cobra por ello.', tags: ['derecha'], coste: -35, grupos: { obreros: -7, empresarios: 6 } },
+  { id: 'impuestos', cat: 'economia', nombre: 'Subida de impuestos', desc: 'Más recaudación a costa de quien más tiene.', tags: ['izquierda'], mods: { impuestos: 1.5 }, grupos: { empresarios: -10, jovenes: -3 }, incompatible: ['rebaja', 'tipo_unico'] },
+  { id: 'rebaja', cat: 'economia', nombre: 'Rebaja fiscal', desc: 'Menos impuestos para animar la inversión.', tags: ['derecha'], mods: { impuestos: 0.7, fabricas: 1.15 }, grupos: { empresarios: 10, obreros: 2 }, incompatible: ['impuestos'] },
+  { id: 'tipo_unico', cat: 'economia', nombre: 'Tipo único de impuestos', desc: 'Todo el mundo paga el mismo porcentaje, gane lo que gane.', tags: ['derecha', 'mercado'], mods: { impuestos: 0.88, fabricas: 1.1 }, grupos: { empresarios: 8, obreros: -5 }, incompatible: ['impuestos', 'fortunas'] },
+  { id: 'fortunas', cat: 'economia', nombre: 'Impuesto a las grandes fortunas', desc: 'Un tributo anual a los mayores patrimonios del país.', tags: ['izquierda'], coste: -30, grupos: { empresarios: -9, obreros: 4, jovenes: 2 }, incompatible: ['tipo_unico'] },
+  { id: 'comercio', cat: 'economia', nombre: 'Libre comercio', desc: 'Se eliminan aranceles: lo que exportas se paga mejor.', tags: ['derecha', 'global'], mods: { export: 1.2 }, grupos: { empresarios: 8, campesinos: -6 }, incompatible: ['aranceles', 'autarquia', 'planificacion'] },
+  { id: 'aranceles', cat: 'economia', nombre: 'Aranceles proteccionistas', desc: 'Se protege el producto nacional frente al extranjero.', tags: ['agrario', 'nacional'], mods: { export: 0.9 }, grupos: { campesinos: 8, obreros: 4, empresarios: -6 }, incompatible: ['comercio'] },
+  { id: 'zonas_francas', cat: 'economia', nombre: 'Zonas francas', desc: 'Puertos y polígonos casi sin impuestos para atraer empresas de fuera.', tags: ['mercado', 'global'], coste: 15, mods: { export: 1.15 }, grupos: { empresarios: 5, obreros: -3 }, incompatible: ['autarquia'] },
+  { id: 'autarquia', cat: 'economia', nombre: 'Autarquía', desc: 'El país se propone producir todo lo que consume y no depender de nadie.', tags: ['nacional', 'estatal'], mods: { export: 0.75, minas: 1.1, granjaExtra: 1 }, grupos: { campesinos: 5, empresarios: -7 }, incompatible: ['comercio', 'zonas_francas'] },
+  { id: 'privatizacion', cat: 'economia', nombre: 'Privatización de servicios', desc: 'El Estado vende empresas públicas y cobra por ello.', tags: ['derecha', 'mercado'], coste: -35, grupos: { obreros: -7, empresarios: 6 }, incompatible: ['nacionalizacion'] },
+  { id: 'nacionalizacion', cat: 'economia', nombre: 'Nacionalización de la industria', desc: 'Las grandes fábricas y las minas pasan a manos del Estado, que se queda sus beneficios.', tags: ['izquierda', 'estatal'], coste: -20, mods: { minas: 1.15, fabricas: 0.92 }, grupos: { obreros: 7, empresarios: -12 }, incompatible: ['privatizacion', 'desregulacion'] },
+  { id: 'desregulacion', cat: 'economia', nombre: 'Desregulación de mercados', desc: 'Menos normas y licencias: abrir un negocio es cuestión de días.', tags: ['mercado', 'derecha'], mods: { fabricas: 1.12, mercados: 1.25 }, grupos: { empresarios: 8, obreros: -5, jovenes: -2 }, incompatible: ['nacionalizacion', 'planificacion'] },
+  { id: 'planificacion', cat: 'economia', nombre: 'Planificación central', desc: 'El Estado fija qué se produce y cuánto, con planes a varios años.', tags: ['estatal', 'autoridad'], mods: { minas: 1.2, construccion: 0.85, export: 0.85 }, grupos: { empresarios: -10, obreros: 3 }, estabilidad: 2, incompatible: ['desregulacion', 'comercio'] },
+  { id: 'banca_publica', cat: 'economia', nombre: 'Banca pública', desc: 'Un banco del Estado da crédito barato a familias y negocios.', tags: ['estatal', 'izquierda'], coste: 15, mods: { construccion: 0.9 }, grupos: { obreros: 3, campesinos: 3, empresarios: -4 } },
   { id: 'loteria', cat: 'economia', nombre: 'Lotería nacional', desc: 'Un sorteo cada semana que llena las arcas.', tags: [], coste: -25, grupos: { obreros: -2 } },
   { id: 'infraestructuras', cat: 'economia', nombre: 'Plan de infraestructuras', desc: 'Carreteras y trenes: construir sale más barato.', tags: [], coste: 30, mods: { construccion: 0.7 }, grupos: { obreros: 2, empresarios: 2, campesinos: 2, jovenes: 2 } },
 
   { id: 'salario', cat: 'trabajo', nombre: 'Salario mínimo', desc: 'Sueldo mínimo garantizado por ley.', tags: ['izquierda'], mods: { fabricas: 0.85 }, grupos: { obreros: 10, empresarios: -8 } },
-  { id: 'laboral', cat: 'trabajo', nombre: 'Reforma laboral flexible', desc: 'Contratar y despedir es más fácil y barato.', tags: ['derecha'], mods: { fabricas: 1.25 }, grupos: { obreros: -10, empresarios: 8 } },
-  { id: 'pensiones', cat: 'trabajo', nombre: 'Pensiones dignas', desc: 'Sube la pensión mínima de jubilación.', tags: ['izquierda', 'social'], coste: 40, grupos: { obreros: 6, campesinos: 6 } },
+  { id: 'laboral', cat: 'trabajo', nombre: 'Reforma laboral flexible', desc: 'Contratar y despedir es más fácil y barato.', tags: ['derecha', 'mercado'], mods: { fabricas: 1.25 }, grupos: { obreros: -10, empresarios: 8 } },
+  { id: 'jornada', cat: 'trabajo', nombre: 'Jornada de 35 horas', desc: 'Menos horas de trabajo por el mismo sueldo.', tags: ['izquierda', 'social'], mods: { fabricas: 0.9 }, grupos: { obreros: 8, jovenes: 3, empresarios: -7 } },
+  { id: 'huelga', cat: 'trabajo', nombre: 'Libertad sindical', desc: 'Sindicatos libres y derecho de huelga protegido.', tags: ['izquierda', 'libertad'], grupos: { obreros: 7, empresarios: -5 }, estabilidad: -2, incompatible: ['sindicato_unico'] },
+  { id: 'sindicato_unico', cat: 'trabajo', nombre: 'Sindicato único', desc: 'Obreros y patronos, en una sola organización dirigida por el Estado. Las huelgas quedan prohibidas.', tags: ['autoridad', 'nacional'], mods: { fabricas: 1.1 }, grupos: { obreros: -7, empresarios: 3 }, estabilidad: 5, incompatible: ['huelga'] },
+  { id: 'cooperativas', cat: 'trabajo', nombre: 'Cooperativas obreras', desc: 'Ayudas para que los trabajadores sean dueños de sus empresas.', tags: ['izquierda'], coste: 15, mods: { fabricas: 1.05 }, grupos: { obreros: 6, empresarios: -4 } },
+  { id: 'pensiones', cat: 'trabajo', nombre: 'Pensiones dignas', desc: 'Sube la pensión mínima de jubilación.', tags: ['izquierda', 'social'], coste: 40, grupos: { obreros: 6, campesinos: 6 }, incompatible: ['jubilacion'] },
+  { id: 'jubilacion', cat: 'trabajo', nombre: 'Retraso de la jubilación', desc: 'Se trabaja dos años más antes de cobrar la pensión.', tags: ['derecha'], coste: -30, grupos: { obreros: -8, campesinos: -5, empresarios: 4 }, incompatible: ['pensiones'] },
 
-  { id: 'sanidad', cat: 'social', nombre: 'Sanidad pública', desc: 'Hospitales gratuitos para toda la población.', tags: ['izquierda', 'social'], coste: 45, grupos: { obreros: 8, campesinos: 6 }, estabilidad: 3 },
+  { id: 'sanidad', cat: 'social', nombre: 'Sanidad pública', desc: 'Hospitales gratuitos para toda la población.', tags: ['izquierda', 'social'], coste: 45, grupos: { obreros: 8, campesinos: 6 }, estabilidad: 3, incompatible: ['sanidad_privada'] },
+  { id: 'sanidad_privada', cat: 'social', nombre: 'Seguros médicos privados', desc: 'La sanidad se paga con un seguro; el Estado solo cubre lo básico.', tags: ['mercado', 'derecha'], coste: -20, grupos: { obreros: -7, campesinos: -4, empresarios: 5 }, incompatible: ['sanidad'] },
   { id: 'educacion', cat: 'social', nombre: 'Educación gratuita', desc: 'Escuelas y universidades sin matrícula.', tags: ['social'], coste: 35, grupos: { jovenes: 12, obreros: 3 } },
   { id: 'vivienda', cat: 'social', nombre: 'Plan de vivienda joven', desc: 'Alquileres asequibles para quien empieza.', tags: ['social'], coste: 30, grupos: { jovenes: 8, obreros: 3 } },
-  { id: 'transparencia', cat: 'social', nombre: 'Ley de transparencia', desc: 'Las cuentas públicas, a la vista de todos.', tags: [], coste: 10, estabilidad: 4, grupos: { obreros: 2, empresarios: 2, campesinos: 2, jovenes: 2 } },
+  { id: 'renta_basica', cat: 'social', nombre: 'Renta básica', desc: 'Un ingreso mínimo cada mes para quien no llega a fin de mes.', tags: ['izquierda', 'social'], coste: 55, grupos: { obreros: 8, jovenes: 8, empresarios: -5 }, estabilidad: 2 },
+  { id: 'natalidad', cat: 'social', nombre: 'Ayudas a las familias', desc: 'Un cheque por cada hijo y permisos más largos.', tags: ['tradicion', 'social'], coste: 25, grupos: { campesinos: 5, obreros: 4 } },
+  { id: 'derechos', cat: 'social', nombre: 'Derechos civiles', desc: 'Igualdad ante la ley y protección de las minorías.', tags: ['social', 'libertad'], grupos: { jovenes: 8, campesinos: -3 }, incompatible: ['policia_politica'] },
+  { id: 'laicismo', cat: 'social', nombre: 'Estado laico', desc: 'La religión sale de las escuelas y de los actos públicos.', tags: ['libertad', 'social'], grupos: { jovenes: 6, campesinos: -5 }, incompatible: ['religion'] },
+  { id: 'religion', cat: 'social', nombre: 'Religión oficial', desc: 'El Estado adopta una fe y paga su culto y sus escuelas.', tags: ['tradicion'], coste: 10, grupos: { campesinos: 7, jovenes: -7 }, estabilidad: 3, incompatible: ['laicismo'] },
+  { id: 'transparencia', cat: 'social', nombre: 'Ley de transparencia', desc: 'Las cuentas públicas, a la vista de todos.', tags: ['libertad'], coste: 10, estabilidad: 4, grupos: { obreros: 2, empresarios: 2, campesinos: 2, jovenes: 2 }, incompatible: ['censura'] },
 
   { id: 'seguridad', cat: 'orden', nombre: 'Ley de seguridad ciudadana', desc: 'Más policía y penas más duras.', tags: ['orden'], coste: 25, estabilidad: 10, grupos: { jovenes: -8 } },
-  { id: 'servicio_militar', cat: 'orden', nombre: 'Servicio militar obligatorio', desc: 'Un año de instrucción para cada joven. Reclutar cuesta un 30% menos y caben 2 regimientos más.', tags: ['orden'], coste: 15, estabilidad: 6, grupos: { jovenes: -12 } },
+  { id: 'servicio_militar', cat: 'orden', nombre: 'Servicio militar obligatorio', desc: 'Un año de instrucción para cada joven. Reclutar cuesta un 30% menos y caben 2 regimientos más.', tags: ['orden', 'nacional'], coste: 15, mods: { reclutar: 0.7, capacidad: 2 }, estabilidad: 6, grupos: { jovenes: -12 } },
+  { id: 'rearme', cat: 'orden', nombre: 'Plan de rearme', desc: 'Fábricas de armas y arsenales nuevos. Reclutar cuesta un 25% menos.', tags: ['nacional', 'orden'], coste: 25, mods: { reclutar: 0.75 }, grupos: { empresarios: 3, jovenes: -4 } },
+  { id: 'milicias', cat: 'orden', nombre: 'Milicias populares', desc: 'Voluntarios armados en cada barrio. Caben 2 regimientos más.', tags: ['nacional'], coste: 10, mods: { capacidad: 2 }, estabilidad: -2, grupos: { obreros: 3, empresarios: -4 } },
+  { id: 'censura', cat: 'orden', nombre: 'Censura de prensa', desc: 'Los periódicos pasan por un censor antes de salir. A la prensa le cuesta el doble destapar un escándalo.', tags: ['autoridad'], mods: { prensa: 0.5 }, estabilidad: 7, grupos: { jovenes: -10, empresarios: -2 }, incompatible: ['transparencia'] },
+  { id: 'policia_politica', cat: 'orden', nombre: 'Policía política', desc: 'Un cuerpo que vigila a opositores, sindicatos y periodistas.', tags: ['autoridad', 'orden'], coste: 20, estabilidad: 9, grupos: { jovenes: -8, obreros: -4 }, incompatible: ['derechos'] },
+
+  { id: 'poderes', cat: 'estado', nombre: 'Poderes especiales', desc: 'El gobierno puede legislar por decreto. Ganas 1 de capital político más cada mes.', tags: ['autoridad'], mods: { cpMes: 1 }, grupos: { obreros: -3, empresarios: -3, campesinos: -3, jovenes: -6 } },
+  { id: 'descentralizacion', cat: 'estado', nombre: 'Autonomía de las provincias', desc: 'Cada provincia decide sobre sus escuelas, sus caminos y sus impuestos locales.', tags: ['agrario', 'libertad'], coste: 15, grupos: { campesinos: 6, jovenes: 2 }, incompatible: ['centralismo'] },
+  { id: 'centralismo', cat: 'estado', nombre: 'Estado centralizado', desc: 'Todo se decide en la capital, con una sola ley para todo el país. La administración cuesta un 15% menos.', tags: ['nacional', 'autoridad'], mods: { admin: 0.85 }, estabilidad: 3, grupos: { campesinos: -6 }, incompatible: ['descentralizacion'] },
+  { id: 'fronteras_abiertas', cat: 'estado', nombre: 'Fronteras abiertas', desc: 'Facilidades para que venga a trabajar gente de otros países.', tags: ['global', 'libertad'], mods: { fabricas: 1.08 }, grupos: { empresarios: 4, jovenes: 3, obreros: -5, campesinos: -2 }, incompatible: ['fronteras_cerradas'] },
+  { id: 'fronteras_cerradas', cat: 'estado', nombre: 'Fronteras cerradas', desc: 'Cupos estrictos de entrada y más controles en los pasos.', tags: ['nacional', 'orden'], coste: 10, mods: { fabricas: 0.95 }, estabilidad: 2, grupos: { campesinos: 4, obreros: 3, jovenes: -5, empresarios: -3 }, incompatible: ['fronteras_abiertas'] },
+  { id: 'cooperacion', cat: 'estado', nombre: 'Cooperación internacional', desc: 'Ayuda al desarrollo y becas para extranjeros. Tu influencia sube 10 puntos.', tags: ['global', 'social'], coste: 20, mods: { influencia: 10 }, grupos: { jovenes: 3 } },
 
   { id: 'agrario', cat: 'ambiente', nombre: 'Subsidios agrarios', desc: 'Ayudas directas al campo.', tags: ['agrario'], coste: 30, mods: { granjaExtra: 1 }, grupos: { campesinos: 12 } },
+  { id: 'reforma_agraria', cat: 'ambiente', nombre: 'Reforma agraria', desc: 'Las grandes fincas se reparten entre quienes las trabajan.', tags: ['izquierda', 'agrario'], mods: { granjaExtra: 1 }, grupos: { campesinos: 10, empresarios: -8 }, incompatible: ['colectivizacion'] },
+  { id: 'colectivizacion', cat: 'ambiente', nombre: 'Colectivización del campo', desc: 'Las tierras se juntan en grandes granjas del Estado.', tags: ['estatal', 'autoridad'], mods: { granjaExtra: 2 }, estabilidad: -3, grupos: { campesinos: -10, obreros: 2 }, incompatible: ['reforma_agraria'] },
   { id: 'ambiental', cat: 'ambiente', nombre: 'Protección ambiental', desc: 'Límites a la minería y a la contaminación.', tags: ['verde'], mods: { minas: 0.75 }, grupos: { jovenes: 9, campesinos: 4, empresarios: -5 } },
+  { id: 'carbono', cat: 'ambiente', nombre: 'Impuesto al carbono', desc: 'Quien contamina, paga.', tags: ['verde'], coste: -20, mods: { minas: 0.9 }, grupos: { jovenes: 5, empresarios: -5, campesinos: -2 } },
   { id: 'renovables', cat: 'ambiente', nombre: 'Energías renovables', desc: 'Energía limpia y barata para la industria.', tags: ['verde'], coste: 35, mods: { fabricas: 1.1 }, grupos: { jovenes: 6 } },
+  { id: 'nuclear', cat: 'ambiente', nombre: 'Energía nuclear', desc: 'Centrales que dan energía barata y constante a las fábricas.', tags: [], coste: 30, mods: { fabricas: 1.15 }, grupos: { empresarios: 3, jovenes: -5 } },
+  { id: 'parques', cat: 'ambiente', nombre: 'Parques nacionales', desc: 'Montes y costas protegidos que atraen visitantes. El turismo rinde un 25% más.', tags: ['verde'], coste: 15, mods: { turismo: 1.25 }, grupos: { jovenes: 4, campesinos: 2 } },
 ];
 
 const NOMBRES_PROPIOS = {
@@ -610,5 +851,13 @@ const OBJETIVOS_CARRERA = [
 ];
 
 const LEY_POR_ID = Object.fromEntries(LEYES.map(l => [l.id, l]));
+// Qué leyes chocan con cada una, en los dos sentidos (basta con que una de las dos lo diga).
+const INCOMPATIBLES = Object.fromEntries(LEYES.map(l => [l.id, []]));
+for (const l of LEYES) {
+  for (const otra of l.incompatible || []) {
+    if (!INCOMPATIBLES[l.id].includes(otra)) INCOMPATIBLES[l.id].push(otra);
+    if (!INCOMPATIBLES[otra].includes(l.id)) INCOMPATIBLES[otra].push(l.id);
+  }
+}
 const EVENTO_POR_ID = Object.fromEntries([...EVENTOS, ...EVENTOS_CARRERA].map(e => [e.id, e]));
 const CAND_POR_ID = Object.fromEntries(CANDIDATOS.map(c => [c.id, c]));

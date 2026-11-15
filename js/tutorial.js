@@ -183,9 +183,9 @@ const PASOS_COMPLETO = [
   {
     titulo: () => 'La ideología',
     texto: () => (ui.cfg.propio
-      ? 'Elige hasta dos <b>principios</b>. Deciden entre qué grupos tienes más tirón (lo dicen las etiquetas de debajo) y qué leyes le gustan a tu partido: las que van contra sus ideas te costarán más.'
+      ? 'Elige la <b>doctrina</b> de tu partido, cuánto Estado defiende y, si quieres, hasta dos causas. De ahí sale entre qué grupos tienes más tirón y qué leyes le gustan a tu partido (lo resume el cuadro del final): las que van contra sus ideas te costarán más.'
       : 'La ideología de tu partido ya viene dada: las leyes que encajan con sus ideas te salen más fáciles, y las que las contradicen cuestan más.'),
-    foco: () => (ui.cfg.propio ? '.principios' : '.lista-partidos'),
+    foco: () => (ui.cfg.propio ? '.doctrinas' : '.lista-partidos'),
   },
   {
     titulo: () => 'A por el país',

@@ -56,7 +56,7 @@ function filaJugador(j, sala) {
   if (j.token === miToken()) etiquetas.push(chip('tú', 'pos'));
   if (!j.conectado) etiquetas.push(chip('desconectado', 'neg'));
   return `<li>${logoPartido({ color: info.color, emblema: info.emblema })}
-    <div><b>${esc(p.lider)}</b><small>${esc(info.partido)}, en ${esc(p.pais)} <i class="punto-color" style="background:${p.colorPais}"></i></small></div>
+    <div><b>${esc(p.lider)}</b><small>${esc(info.partido)}${DOCTRINAS[info.doctrina] ? ` (${DOCTRINAS[info.doctrina].nombre.toLowerCase()})` : ''}, en ${esc(p.pais)} <i class="punto-color" style="background:${p.colorPais}"></i></small></div>
     <span class="chips">${etiquetas.join('')}</span></li>`;
 }
 
@@ -241,7 +241,7 @@ setInterval(() => { if (enRed() && ui.pantalla === 'juego') actualizarReloj(); }
 // Al recibir cambios en multijugador: avisos de lo nuevo (noticias, objetivos, decisiones pendientes).
 function avisosDeRed() {
   const s = estado, u = ui.ultimo;
-  const pendiente = !!(s.evento || s.votacion || s.propuestas.length);
+  const pendiente = !!(s.evento || s.votacion || s.propuestas.length || (s.sucesos && s.sucesos.length) || plenoPendiente());
   const hechos = new Set(Object.keys(s.objetivos));
   if (u && u.nacion === s.nacion) {
     const nuevas = s.nNoticias - u.nNoticias;

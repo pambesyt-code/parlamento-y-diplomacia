@@ -236,7 +236,7 @@ const faltanElecciones = s => s.proximaEleccion - s.mes;
 const statFecha = { k: 'fecha', nombre: 'Fecha', icono: 'calendario', tip: 'Cada turno es un mes', texto: s => fecha(s.mes) };
 const statCP = {
   k: 'cp', nombre: 'Capital político', icono: 'estrella', tip: 'Se gasta en casi todo lo que haces. Recuperas 2 cada mes.',
-  valor: s => s.cp, fmt: n => `${n}/${CP_MAXIMO}`, delta: () => ['+2 al mes', ''],
+  valor: s => s.cp, fmt: n => `${n}/${CP_MAXIMO}`, delta: s => [`+${cpAlMes(s)} al mes`, ''],
 };
 const STATS = {
   gobierno: [
@@ -358,7 +358,7 @@ const tabsActuales = () => (esOposicion() ? TABS_OPOSICION : estado && estado.mo
 function renderTabs() {
   const s = estado, tabs = tabsActuales();
   ponerHTML($('#tabs'), Object.keys(tabs).map(t => {
-    const pendiente = (t === 'parlamento' && s.propuesta) || (t === 'gobierno' && !numMinistros(s)) || (t === 'defensa' && enGuerra(s))
+    const pendiente = (t === 'parlamento' && (s.propuesta || s.pleno)) || (t === 'gobierno' && !numMinistros(s)) || (t === 'defensa' && enGuerra(s))
       || (t === 'partido' && esLider(s) && s.carrera.promesas.length < MAX_PROMESAS);
     return `<button class="tab ${ui.tab === t ? 'activa' : ''}" data-a="tab" data-v="${t}" aria-pressed="${ui.tab === t}">
       ${ico(t === 'partido' ? s.config.emblema : tabs[t][1])}<span>${tabs[t][0]}</span>${pendiente ? '<i class="punto"></i>' : ''}</button>`;
@@ -454,6 +454,9 @@ function tabEconomia() {
   if (Math.abs(m.minas - 1) > 0.004) mods.push(chip(`Minas ${pct(m.minas)}`, clase(m.minas - 1)));
   if (Math.abs(m.export - 1) > 0.004) mods.push(chip(`Exportaciones ${pct(m.export)}`, clase(m.export - 1)));
   if (Math.abs(m.construccion - 1) > 0.004) mods.push(chip(`Construir ${pct(m.construccion)}`, clase(1 - m.construccion)));
+  if (Math.abs(m.mercados - 1) > 0.004) mods.push(chip(`Mercados ${pct(m.mercados)}`, clase(m.mercados - 1)));
+  if (Math.abs(m.turismo - 1) > 0.004) mods.push(chip(`Turismo ${pct(m.turismo)}`, clase(m.turismo - 1)));
+  if (Math.abs(m.admin - 1) > 0.004) mods.push(chip(`Gasto de administración ${pct(m.admin)}`, clase(1 - m.admin)));
   const lineas = filtro => e.lineas.filter(filtro).map(l => `<div class="fila"><span>${l.texto}</span><b class="${clase(l.v)}">${signo(l.v)}</b></div>`).join('');
   return `<h2>Economía</h2>
     <p class="nota">Las granjas dan alimentos, las minas materias primas y las fábricas las convierten en bienes. Lo que sobra se vende solo.</p>
@@ -472,6 +475,7 @@ function tabEconomia() {
         <b>${N.nombre}</b>${actual ? '<small>Los de ahora</small>'
           : `<span class="chips">${chip(`${signo(r.dinero) || '±0'} al mes`, clase(r.dinero))}${r.popularidad ? chip(`Popularidad ${signo(r.popularidad)}`, clase(r.popularidad)) : ''}</span>`}</button>`;
     }).join('')}</div>
+    ${htmlModelo()}
     <h3>Ingresos del mes</h3>${lineas(l => l.v > 0)}
     <h3>Gastos del mes</h3>${lineas(l => l.v < 0)}
     <div class="fila total"><span>Balance mensual</span><b class="${clase(e.balance)}">${signo(e.balance) || '0'}</b></div>
@@ -479,7 +483,32 @@ function tabEconomia() {
     <h3>Préstamos</h3>
     <p class="nota">Recibes 200 al momento y devuelves ${cuotaPrestamo(estado)} al mes durante 24 meses${contarEdificios(estado).banco ? ' (tu banco abarata la cuota)' : ''}. Tienes ${estado.prestamos.length} de 3.</p>
     ${boton(`${ico('moneda')} Pedir un préstamo`, { a: 'prestamo' }, puedePrestamo(estado))}
+    ${htmlAnuncios()}
     ${htmlCorrupcion()}`;
+}
+
+// El modelo económico: cuánto interviene el Estado. Cada opción dice qué cambia frente al de ahora.
+function htmlModelo() {
+  const s = estado, D = doctrinaGobierno(s), ideal = ORDEN_MODELOS[nivelIdeal(s)], dist = distanciaModelo(s);
+  const actualM = s.modelo || 'mixta', traba = puedeCambiarModelo(s, ORDEN_MODELOS.find(n => n !== actualM)).motivo;
+  return `<h3>Modelo económico</h3>
+    <p class="nota">Cuánto interviene el Estado en la economía. Cambiarlo cuesta ${CP_CAMBIAR_MODELO} de capital político y solo se puede una vez cada ${MESES_ENTRE_MODELOS} meses.
+      Tu partido defiende «${MODELOS[ideal].nombre.toLowerCase()}»: por cada paso que te alejes, pierdes 2 de apoyo en todos los grupos.</p>
+    ${dist ? `<p class="motivo">Gobiernas a ${plural(dist, 'paso', 'pasos')} del modelo de tu partido: −${2 * dist} de apoyo en todos los grupos.</p>` : ''}
+    <div class="niveles modelos">${ORDEN_MODELOS.map(n => {
+      const M = MODELOS[n], actual = actualM === n;
+      let viejo;
+      const r = actual ? null : medirCambio(s, () => { viejo = s.modelo; s.modelo = n; }, () => { s.modelo = viejo; });
+      return `<button class="nivel ${actual ? 'activa' : ''}" data-a="modelo" data-v="${n}" ${puedeCambiarModelo(s, n).ok ? '' : 'disabled'} aria-pressed="${actual}">
+        <b>${M.nombre}</b>${n === ideal ? '<small class="ideal">El de tu partido</small>' : ''}${actual ? '<small>El de ahora</small>'
+          : `<span class="chips">${chip(`${signo(r.dinero) || '±0'} al mes`, clase(r.dinero))}${r.popularidad ? chip(`Popularidad ${signo(r.popularidad)}`, clase(r.popularidad)) : ''}${r.estabilidad ? chip(`Estabilidad ${signo(r.estabilidad)}`, clase(r.estabilidad)) : ''}</span>`}
+        </button>`;
+    }).join('')}</div>
+    ${traba ? `<p class="motivo">${traba}: de momento no puedes cambiar de modelo.</p>` : ''}
+    <div class="tarjeta"><div class="tarjeta-cab"><b>${MODELOS[actualM].nombre}</b><span class="cuenta">en vigor</span></div>
+      <p>${MODELOS[actualM].desc}</p><div class="chips">${chipsModelo(MODELOS[actualM]) || chip('Sin efectos')}</div></div>
+    ${D ? `<div class="tarjeta"><div class="tarjeta-cab"><b>${ico('estrella')} Doctrina: ${D.nombre}</b><span class="cuenta">tu partido</span></div>
+      <p>${D.rasgo.texto}</p></div>` : ''}`;
 }
 
 function hemicicloSVG(escanos) {
@@ -511,7 +540,7 @@ function tabParlamento() {
     <div class="leyenda">${ORDEN_HEMICICLO.map(pid => {
       const P = partidoInfo(s, pid), rel = P.jugador ? 0 : relacionPartido(s, pid);
       const gobierna = carrera ? pid === s.gobiernoIA : P.jugador;
-      return `<div>${logoPartido(P, 'mini')}<b>${esc(P.nombre)}</b><small class="lider">${esc(P.lider)}</small><span>${s.escanos[pid]} escaños</span>${gobierna ? chip('gobierna') : ''}${P.humano ? chip('jugador', 'pos') : ''}
+      return `<div title="${esc(nombreDoctrina(s, pid))}">${logoPartido(P, 'mini')}<b>${esc(P.nombre)}</b><small class="lider">${esc(P.lider)}</small><span>${s.escanos[pid]} escaños</span>${gobierna ? chip('gobierna') : ''}${P.humano ? chip('jugador', 'pos') : ''}
         ${P.jugador ? '<span class="cuenta">tu partido</span>' : `<span class="cuenta ${clase(rel)}">relación ${signo(rel) || '0'}</span>`}</div>`;
     }).join('')}</div>
     <div class="encuesta"><div class="tarjeta-cab"><b>Encuesta</b><span class="cuenta">si hoy hubiera elecciones</span></div>
@@ -528,10 +557,12 @@ function tabParlamento() {
       <p class="nota">Cumplir una da +2 de apoyo en todos los grupos. Incumplirla quita 8 a quienes la esperaban.</p></div>`;
   }
 
+  html += htmlPlenoAbierto();
   const prop = s.propuesta;
   if (prop) {
     const ley = LEY_POR_ID[prop.ley], r = intencionVoto(s, prop);
     const votoTxt = { si: 'A favor', no: 'En contra', abs: 'Se abstiene' };
+    const hayJugadores = Object.values(r.partidos).some(d => d.humano);
     html += `<div class="tarjeta tramite">
       <div class="tarjeta-cab"><b>${prop.derogar ? 'Derogar: ' : ''}${ley.nombre}</b><span class="cuenta">en trámite</span></div>
       <div class="chips">${chipsLey(ley)}</div>
@@ -540,17 +571,18 @@ function tabParlamento() {
         const P = partidoInfo(s, pid), d = r.partidos[pid];
         const porque = P.jugador
           ? (d.voto === 'si' ? 'Tu partido respalda la propuesta' : `La dirección no te respalda: te hacen falta ${APOYO_PARA_RESPALDO} de apoyo en el partido`)
-          : d.postura ? `Lo dirige otro jugador, ${esc(P.lider)}, y ${d.voto === 'si' ? 'apoya' : 'bloquea'} todo lo del gobierno`
+          : d.humano ? `Lo dirige otro jugador, ${esc(P.lider)}: decidirá su voto cuando lleves la ley al pleno`
           : `Ideología ${signo(d.ideologia) || '0'}, relación ${signo(d.relacion) || '0'}${d.negociado ? `, negociado +${d.negociado}` : ''}`;
         return `<div class="voto">${logoPartido(P, 'mini')}
           <div class="voto-txt"><b>${esc(P.siglas)}</b> ${s.escanos[pid]} escaños<small>${porque}</small></div>
-          <div class="voto-der"><span class="intencion ${d.voto}">${votoTxt[d.voto]}</span>
-          ${P.jugador || d.postura ? '' : boton(`Negociar ${ico('estrella')}1`, { a: 'negociar', partido: pid }, puedeNegociar(s, pid), 'mini')}</div>
+          <div class="voto-der"><span class="intencion ${d.voto}">${d.humano ? 'Previsto: ' : ''}${votoTxt[d.voto]}</span>
+          ${P.jugador || d.humano ? '' : boton(`Negociar ${ico('estrella')}1`, { a: 'negociar', partido: pid }, puedeNegociar(s, pid), 'mini')}</div>
         </div>`;
       }).join('')}
       <p class="recuento">A favor <b>${r.si}</b>, en contra <b>${r.no}</b>, abstención <b>${r.abs}</b>.
         <b class="${r.aprueba ? 'pos' : 'neg'}">${r.aprueba ? 'Saldría aprobada.' : 'Sería rechazada.'}</b></p>
-      <p class="nota">Un partido vota a favor con +1 o más y en contra con −1 o menos. Cada negociación suma +1.</p>
+      <p class="nota">Un partido vota a favor con +1 o más y en contra con −1 o menos. Cada negociación suma +1.${hayJugadores
+        ? ' Los partidos de otros jugadores votan lo que ellos decidan: al llevarla al pleno les saltará la votación y el recuento puede cambiar.' : ''}</p>
       <div class="botones">${boton(`Llevar a votación ${ico('estrella')}${costeVotar(s)}`, { a: 'votar' }, s.cp >= costeVotar(s) ? { ok: true } : { ok: false, motivo: 'Sin capital político' }, 'principal')}
       <button class="btn" data-a="retirar">Retirar</button></div>
     </div>`;
@@ -776,14 +808,16 @@ function htmlInversiones() {
 // ---------- Ventanas ----------
 
 function htmlVoto() {
-  const v = votoEnPantalla(), ley = LEY_POR_ID[v.ley];
+  const v = votoEnPantalla(), censura = v.tipo === 'censura', ley = censura ? null : LEY_POR_ID[v.ley];
   const txt = { si: 'A favor', no: 'En contra', abs: 'Abstención' };
-  const autor = !v.autor || v.autor === ID_JUGADOR ? ''
+  const autor = censura ? `<p class="nota">${v.relevo ? `${esc(v.relevo.entra)} pasa a gobernar y ${esc(v.relevo.sale)} pasa a la oposición.` : 'El gobierno sigue en su sitio.'}</p>`
+    : !v.autor || v.autor === ID_JUGADOR ? (esOposicion() ? `<p class="nota">Ley del gobierno de ${nombrePartido(v.autor || ID_JUGADOR)}.</p>` : '')
     : opositorDe(estado, v.autor) ? `<p class="nota">Ley presentada por ${nombrePartido(v.autor)}, desde la oposición.</p>`
       : `<p class="nota">Ley del gobierno de ${nombrePartido(v.autor)}.</p>`;
-  return `<h2>${v.derogar ? 'Derogar: ' : ''}${ley.nombre}</h2>${autor}
+  const sello = censura ? (v.aprueba ? 'Prospera' : 'Fracasa') : v.aprueba ? (v.derogar ? 'Derogada' : 'Aprobada') : 'Rechazada';
+  return `<h2>${censura ? 'Moción de censura' : `${v.derogar ? 'Derogar: ' : ''}${ley.nombre}`}</h2>${autor}
     <div class="voto-escena">${hemicicloSVG(v.escanos)}
-      <div id="sello" class="sello ${v.aprueba ? 'si' : 'no'}">${v.aprueba ? (v.derogar ? 'Derogada' : 'Aprobada') : 'Rechazada'}</div></div>
+      <div id="sello" class="sello ${v.aprueba ? 'si' : 'no'}">${sello}</div></div>
     <div class="voto-cuentas">
       <div class="vc si"><b id="cuenta-si">0</b><span>A favor</span></div>
       <div class="vc no"><b id="cuenta-no">0</b><span>En contra</span></div>
@@ -924,6 +958,14 @@ function htmlFin() {
     <div class="resumen-fin">${resumen}</div>${botonesFin()}`;
 }
 
+// Un aviso que hay que leer: algo que ha hecho otro jugador y que te afecta.
+function htmlSuceso() {
+  const x = estado.sucesos[0];
+  return `<div class="ev-cab"><span class="ev-ico">${ico(x.icono || 'periodico')}</span><h2>${esc(x.titulo)}</h2></div>
+    <p>${esc(x.texto)}</p>
+    <button class="btn principal" data-a="cerrarSuceso">Entendido</button>`;
+}
+
 function htmlEvento() {
   const s = estado, ev = s.evento, e = EVENTO_POR_ID[ev.id], t = x => esc(textoEvento(s, ev, x));
   return `<div class="ev-cab"><span class="ev-ico">${ico(e.icono)}</span><h2>${t(e.titulo)}</h2></div>
@@ -936,6 +978,7 @@ function renderModal() {
   let tipo = '', html = '';
   if (ui.ventana === 'opciones') [tipo, html] = ['opciones', htmlOpciones()];
   else if (ui.ventana === 'ayuda') [tipo, html] = ['ayuda', htmlAyuda(false)];
+  else if (ui.ventana === 'privacidad') [tipo, html] = ['ayuda', htmlPrivacidad()];
   else if (ui.ventana === 'confirmar') [tipo, html] = ['confirmar', htmlConfirmar()];
   else if (ui.ventana === 'tutorial') [tipo, html] = ['tutorial', htmlElegirTutorial()];
   else if (enJuego && ui.ventana === 'noticias') [tipo, html] = ['noticias', htmlNoticias()];
@@ -943,6 +986,7 @@ function renderModal() {
     // En la oposición solo hay tus votaciones, el final de la partida y la bienvenida.
     if (votoEnPantalla()) [tipo, html] = ['voto', htmlVoto()];
     else if (s.fin) [tipo, html] = ['fin', htmlFin()];
+    else if (plenoPendiente()) [tipo, html] = ['pleno', htmlPleno()];
     else if (ui.ventana === 'intro') [tipo, html] = ['intro', htmlIntroOposicion()];
   }
   else if (enJuego && ui.ventana && ui.ventana.startsWith('guerra:')) [tipo, html] = ['declarar', htmlDeclarar(ui.ventana.slice(7))];
@@ -954,7 +998,9 @@ function renderModal() {
     else if (s.congreso) [tipo, html] = ['congreso', htmlCongreso()];
     else if (s.caida && !s.fin) [tipo, html] = ['caida', htmlCaida()];
     else if (s.fin) [tipo, html] = ['fin', htmlFin()];
+    else if (s.sucesos && s.sucesos.length) [tipo, html] = ['suceso', htmlSuceso()];
     else if (s.propuestas && s.propuestas.length) [tipo, html] = ['propuesta', htmlPropuesta()];
+    else if (plenoPendiente()) [tipo, html] = ['pleno', htmlPleno()];
     else if (s.votacion) [tipo, html] = ['votacion', htmlVotacionGobierno()];
     else if (s.evento) [tipo, html] = ['evento', htmlEvento()];
     else if (ui.ventana === 'intro') [tipo, html] = ['intro', htmlAyuda(true)];
@@ -1042,12 +1088,17 @@ function jugar(nombre, d = {}) {
 
 const acciones = {
   ...accionesTutorial,
+  ...accionesAnuncios,
   // Menú y ventanas
   menuNueva: () => { Object.assign(ui, { menu: 'nueva', paso: 1, menuAnim: true }); },
   menuPrincipal: () => { ui.menu = 'principal'; ui.menuAnim = true; RED.error = ''; },
   paso: d => { ui.paso = +d.v; scrollTo(0, 0); },
   // Los valores llegan como texto desde el HTML: algunos campos son números o un sí/no.
-  cfg: d => { ui.cfg[d.k] = d.k === 'legislatura' || d.k === 'nPartidos' ? +d.v : d.k === 'propio' ? d.v === '1' : d.v; },
+  cfg: d => {
+    ui.cfg[d.k] = d.k === 'legislatura' || d.k === 'nPartidos' || d.k === 'intervencion' ? +d.v : d.k === 'propio' ? d.v === '1' : d.v;
+    // Al cambiar de doctrina, la intervención del Estado vuelve a la que esa doctrina defiende.
+    if (d.k === 'doctrina') ui.cfg.intervencion = DOCTRINAS[d.v].intervencion;
+  },
   cfgPrincipio: d => {
     const p = ui.cfg.principios, i = p.indexOf(d.v);
     if (i >= 0) p.splice(i, 1); else if (p.length < MAX_PRINCIPIOS) p.push(d.v);
@@ -1127,6 +1178,10 @@ const acciones = {
   mes: () => { if (enRed()) alternarListo(); else jugar('mes'); },
 
   impuestos: d => jugar('impuestos', d),
+  modelo: d => jugar('modelo', d),
+  plenoVotar: d => jugar(esOposicion() ? 'oposVotar' : 'plenoVotar', d),
+  oposCensura: () => jugar('oposCensura'),
+  cerrarSuceso: () => jugar('cerrarSuceso'),
   construir: d => jugar('construir', d),
   demoler: d => jugar('demoler', d),
   prestamo: () => jugar('prestamo'),
@@ -1183,6 +1238,7 @@ const SONIDOS = {
   tab: 'pestana', construir: 'construir', demoler: 'construir', mes: 'mes', prestamo: 'moneda', nombrar: 'moneda', mitin: 'evento',
   accionCarrera: 'moneda', prometer: 'moneda', formarGobierno: 'victoria', saltarVoto: '', votar: '', postura: '',
   reclutar: 'construir', declarar: 'derrota', paz: 'moneda', atacar: '', impuestos: 'moneda', zoom: 'pestana', responder: 'moneda',
+  modelo: 'moneda', plenoVotar: '', oposCensura: 'derrota',
 };
 
 document.addEventListener('click', ev => {
@@ -1213,7 +1269,7 @@ document.addEventListener('click', ev => {
     if (!estado.resultadoVoto) {
       for (const o of revisarObjetivos(estado)) { aviso(`Objetivo cumplido: ${o.texto}`, 'logro', 'diana'); Sonido.tocar('logro'); }
     }
-    if (!pendiente && (estado.evento || estado.votacion)) setTimeout(() => Sonido.tocar('evento'), 220);
+    if (!pendiente && (estado.evento || estado.votacion || (estado.sucesos && estado.sucesos.length))) setTimeout(() => Sonido.tocar('evento'), 220);
     if (!congresoAntes && estado.congreso) setTimeout(() => Sonido.tocar(estado && estado.congreso && estado.congreso.gana ? 'victoria' : 'derrota'), 300);
     if (!ui.tutorial) guardar(estado);
   }

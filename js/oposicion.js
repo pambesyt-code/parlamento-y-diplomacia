@@ -9,10 +9,11 @@ const opositorPorToken = (s, token) => (s && s.oposicion ? s.oposicion.find(o =>
 // El hueco del partido en el parlamento (ver huecoDe en game.js).
 const huecoPartido = perfil => huecoDe(perfil);
 
+// Lo que vota tu grupo ante una ley del gobierno cuando no llegas a votar tú antes de que acabe el mes.
 const POSTURAS = {
-  ideas: { nombre: 'Según nuestras ideas', desc: 'Tu grupo vota cada ley según encaje con vuestros principios.' },
-  apoyar: { nombre: 'Apoyar al gobierno', desc: 'Votáis a favor de todo lo que presente el gobierno.' },
-  bloquear: { nombre: 'Bloquear al gobierno', desc: 'Votáis en contra de todo lo que presente el gobierno.' },
+  ideas: { nombre: 'Según nuestras ideas', desc: 'Tu grupo vota cada ley según encaje con las ideas del partido.' },
+  apoyar: { nombre: 'Apoyar al gobierno', desc: 'Tu grupo vota a favor de lo que presente el gobierno.' },
+  bloquear: { nombre: 'Bloquear al gobierno', desc: 'Tu grupo vota en contra de lo que presente el gobierno.' },
 };
 
 const ACCIONES_OPOSICION = {
@@ -21,6 +22,7 @@ const ACCIONES_OPOSICION = {
   denunciar: { nombre: 'Denunciar al gobierno', cp: 2, desc: 'El apoyo al gobierno baja 1 punto en todos los grupos.' },
 };
 const COSTE_LEY_OPOSICION = 2;
+const CP_CENSURA = 4;
 
 function crearOpositor(token, perfil) {
   return {
@@ -36,14 +38,34 @@ function puedeAccionOposicion(s, o, id) {
 }
 
 function puedeLeyOposicion(s, o, leyId, derogar) {
-  const ley = LEY_POR_ID[leyId];
   if (o.cp < COSTE_LEY_OPOSICION) return { ok: false, motivo: 'Sin capital político' };
   if (o.hechas.ley === s.mes) return { ok: false, motivo: 'Una ley al mes' };
-  if (!derogar && ley.incompatible && s.leyes[ley.incompatible]) return { ok: false, motivo: `Incompatible con «${LEY_POR_ID[ley.incompatible].nombre}»` };
+  if (s.pleno) return { ok: false, motivo: 'Hay una votación en marcha' };
+  const choca = !derogar && leyQueChoca(s, leyId);
+  if (choca) return { ok: false, motivo: `Incompatible con «${LEY_POR_ID[choca].nombre}»` };
   return { ok: true };
 }
 
-// La propuesta tal como se vota: el grupo del gobierno vota según sus ideas.
+// Una moción de censura: si sale adelante, quien la presenta pasa a gobernar sin esperar a las urnas.
+function puedeCensura(s, o) {
+  if (s.pleno) return { ok: false, motivo: 'Hay una votación en marcha' };
+  if (o.censura === s.legislatura) return { ok: false, motivo: 'Solo una por legislatura' };
+  if (s.mes - s.inicioLegislatura < 3) return { ok: false, motivo: 'El gobierno acaba de empezar' };
+  if (o.cp < CP_CENSURA) return { ok: false, motivo: 'Sin capital político' };
+  return { ok: true };
+}
+
+// Lo que cambia tu imagen al votar una ley de otro: quedas bien con quienes salen ganando con tu
+// voto y mal con quienes salen perdiendo. Abstenerse no mueve nada.
+function imagenPorVoto(prop, voto) {
+  const ley = LEY_POR_ID[prop.ley], cambio = {};
+  if (!ley || voto === 'abs') return cambio;
+  const signo = (prop.derogar ? -1 : 1) * (voto === 'si' ? 1 : -1);
+  for (const g in ley.grupos || {}) cambio[g] = ley.grupos[g] * signo > 0 ? 1 : -1;
+  return cambio;
+}
+
+// La propuesta tal como se vota: si quien gobierna no llega a votar, su grupo lo hace según sus ideas.
 function propuestaOposicion(s, o, leyId, derogar) {
   const opinion = opinionPartido(s, leyId, derogar);
   return { ley: leyId, derogar, autor: o.partido, negociado: {}, votoJugador: opinion >= 1 ? 'si' : opinion <= -1 ? 'no' : 'abs' };
@@ -77,16 +99,27 @@ const REGLAS_OPOSICION = {
     if (!LEY_POR_ID[d.ley] || !puedeLeyOposicion(s, o, d.ley, derogar).ok) return;
     o.cp -= COSTE_LEY_OPOSICION;
     o.hechas.ley = s.mes;
-    // El recuento lo ve quien presentó la ley; al gobierno le llega como noticia.
-    const previo = s.resultadoVoto;
-    resolverVotacion(s, propuestaOposicion(s, o, d.ley, derogar));
-    o.resultadoVoto = s.resultadoVoto;
-    s.resultadoVoto = previo;
-    // Sacar adelante leyes a las que se oponía el gobierno mejora la imagen ante quienes se benefician.
-    if (o.resultadoVoto.aprueba) {
-      const ley = LEY_POR_ID[d.ley], signo = derogar ? -1 : 1;
-      for (const g in ley.grupos || {}) o.imagen[g] = limitar(o.imagen[g] + Math.round(ley.grupos[g] * signo / 3), -15, 15);
+    const quien = partidoInfo(s, o.partido).nombre, cual = LEY_POR_ID[d.ley].nombre;
+    noticia(s, derogar ? `${quien} pide en el pleno derogar «${cual}».` : `${quien} lleva al pleno «${cual}».`);
+    // Se abre el pleno: el gobierno y los demás jugadores deciden qué vota su grupo.
+    abrirPleno(s, propuestaOposicion(s, o, d.ley, derogar));
+  },
+  // Tu voto en un pleno abierto por otro jugador.
+  oposVotar: (s, o, d) => {
+    const p = s.pleno;
+    if (!hayPlenoPara(s, o.partido) || !['si', 'no', 'abs'].includes(d.v)) return;
+    if (p.tipo !== 'censura') {
+      const cambio = imagenPorVoto(p, d.v);
+      for (const g in cambio) o.imagen[g] = limitar(o.imagen[g] + cambio[g], -15, 15);
     }
+    votarEnPleno(s, o.partido, d.v);
+  },
+  oposCensura: (s, o) => {
+    if (!puedeCensura(s, o).ok) return;
+    o.cp -= CP_CENSURA;
+    o.censura = s.legislatura;
+    noticia(s, `${o.perfil.lider} presenta una moción de censura contra el gobierno de ${s.config.lider}.`, 'mal');
+    abrirPleno(s, { tipo: 'censura', autor: o.partido });
   },
   oposCerrarVoto: (s, o) => { o.resultadoVoto = null; },
 };
@@ -97,7 +130,8 @@ function mesOposicion(s) {
 
 const perfilDeConfig = c => ({
   lider: c.lider, propio: c.propio, partidoId: c.partidoId, partido: c.partido, color: c.color, emblema: c.emblema,
-  principios: [...(c.principios || [])], pais: c.pais, colorPais: c.colorPais, nacion: c.nacion, hueco: huecoDe(c),
+  principios: [...(c.principios || [])], doctrina: c.doctrina, intervencion: c.intervencion,
+  pais: c.pais, colorPais: c.colorPais, nacion: c.nacion, hueco: huecoDe(c),
 });
 
 // Tras unas elecciones que gana un partido de la oposición: su jugador pasa a gobernar y quien
@@ -118,7 +152,7 @@ function cambiarGobierno(s, o) {
   registrarHumano(s.nacion, s.config);
   for (const g in GRUPOS) s.grupos[g] = dificultad(s).apoyoBase;
   for (const id in CARTERAS) s.ministros[id] = null;
-  Object.assign(s, { promesas: [], propuesta: null, votacion: null });
+  Object.assign(s, { promesas: [], propuesta: null, votacion: null, pleno: null });
   relacionesIniciales(s);
   noticia(s, `${s.config.lider} forma gobierno con ${s.config.partido}. ${antes.perfil.lider} pasa a la oposición.`, 'bien');
   return antes.perfil.lider;

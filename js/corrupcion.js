@@ -90,6 +90,7 @@ function caerDelGobierno(s, motivo) {
   const rivales = Object.keys(s.escanos).filter(pid => pid !== ID_JUGADOR);
   s.modo = 'carrera';
   s.gobiernoIA = rivales.reduce((a, b) => (s.escanos[b] > s.escanos[a] ? b : a));
+  s.modelo = modeloDePartido(s.gobiernoIA);
   s.carrera = {
     cargo: 'lider', prestigio: 30, interno: 50, fondos: 80, apoyoLider: dif.apoyoLider,
     imagen: {}, promesas: [], hechas: {}, propias: {}, congresoMes: null, intentos: 0, mesLider: -1,
@@ -97,7 +98,7 @@ function caerDelGobierno(s, motivo) {
   };
   for (const g in GRUPOS) { s.carrera.imagen[g] = 0; s.grupos[g] = Math.min(s.grupos[g], dif.apoyoOposicion + 5); }
   for (const id in CARTERAS) s.ministros[id] = null;
-  Object.assign(s, { propuesta: null, votacion: null, promesas: [], obras: [] });
+  Object.assign(s, { propuesta: null, votacion: null, promesas: [], obras: [], pleno: null });
   if (motivo !== 'elecciones') {
     // Tras una dimisión hay elecciones en un año.
     s.proximaEleccion = s.mes + Math.min(12, MESES_LEGISLATURA);
@@ -136,7 +137,8 @@ const CORRUPCION = {
 const SOSPECHA_MAX = 100;
 
 // Probabilidad de que te pillen este mes, de 0 a 1.
-const riesgoCorrupcion = s => Math.min(0.6, Math.max(0, ((s.sospecha || 0) - 10) / 200));
+// Con censura de prensa cuesta más destaparlo (ver el modificador «prensa» de las leyes).
+const riesgoCorrupcion = s => Math.min(0.6, Math.max(0, ((s.sospecha || 0) - 10) / 200) * modsPoliticos(s).prensa);
 const corrupcionDisponible = s => Object.keys(CORRUPCION).filter(id => {
   const m = CORRUPCION[id].modo;
   return m === 'todos' || m === s.modo;

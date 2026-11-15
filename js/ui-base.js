@@ -27,7 +27,7 @@ function boton(contenido, datos, poder, cls = '') {
 
 const OPCIONES_GUARDADO = 'pyd-opciones-v1';
 const opciones = {
-  tema: 'claro', sonido: true, volumen: 0.5, texto: 'normal', asesora: true, avisos: true, rotulos: true,
+  tema: 'claro', sonido: true, volumen: 0.5, texto: 'normal', asesora: true, avisos: true, rotulos: true, idioma: idiomaPorDefecto(),
   animaciones: !matchMedia('(prefers-reduced-motion: reduce)').matches,
 };
 try { Object.assign(opciones, JSON.parse(localStorage.getItem(OPCIONES_GUARDADO)) || {}); } catch (e) { /* sin almacenamiento */ }
@@ -38,6 +38,7 @@ function aplicarOpciones() {
   d.anim = opciones.animaciones ? 'si' : 'no';
   d.texto = opciones.texto;
   d.rotulos = opciones.rotulos ? 'si' : 'no';
+  I18N.fijar(opciones.idioma);
   try { localStorage.setItem(OPCIONES_GUARDADO, JSON.stringify(opciones)); } catch (e) { /* sin almacenamiento */ }
 }
 const animar = () => opciones.animaciones;
@@ -152,8 +153,38 @@ function chipsLey(ley) {
   if (m.export) c.push(chip(`Exportaciones ${pct(m.export)}`, m.export > 1 ? 'pos' : 'neg'));
   if (m.construccion) c.push(chip(`Construir ${pct(m.construccion)}`, 'pos'));
   if (m.granjaExtra) c.push(chip(`Granjas +${m.granjaExtra} alimento`, 'pos'));
+  c.push(...chipsModsExtra(m));
   if (ley.estabilidad) c.push(chip(`Estabilidad ${signo(ley.estabilidad)}`, clase(ley.estabilidad)));
   for (const g in ley.grupos || {}) c.push(chip(`${GRUPOS[g].nombre} ${signo(ley.grupos[g])}`, clase(ley.grupos[g])));
+  return c.join('');
+}
+
+// Los modificadores que no son de producción: mercados, turismo, administración, ejército, prensa...
+function chipsModsExtra(m) {
+  const c = [];
+  if (m.mercados) c.push(chip(`Mercados ${pct(m.mercados)}`, m.mercados > 1 ? 'pos' : 'neg'));
+  if (m.turismo) c.push(chip(`Turismo ${pct(m.turismo)}`, m.turismo > 1 ? 'pos' : 'neg'));
+  if (m.admin) c.push(chip(`Gasto de administración ${pct(m.admin)}`, m.admin < 1 ? 'pos' : 'neg'));
+  if (m.reclutar) c.push(chip(`Reclutar ${pct(m.reclutar)}`, m.reclutar < 1 ? 'pos' : 'neg'));
+  if (m.capacidad) c.push(chip(`Caben ${m.capacidad} regimientos más`, 'pos'));
+  if (m.cpMes) c.push(chip(`Capital político +${m.cpMes} al mes`, 'pos'));
+  if (m.influencia) c.push(chip(`Influencia +${m.influencia}`, 'pos'));
+  if (m.prensa) c.push(chip(m.prensa < 1 ? 'La prensa destapa menos escándalos' : 'La prensa destapa más escándalos', m.prensa < 1 ? 'pos' : 'neg'));
+  return c;
+}
+
+// Los efectos de un modelo económico o de una doctrina, con las mismas etiquetas que las leyes.
+function chipsModelo(M) {
+  const c = [], m = M.mods || {};
+  if (m.impuestos) c.push(chip(`Impuestos ${pct(m.impuestos)}`, m.impuestos > 1 ? 'pos' : 'neg'));
+  if (m.fabricas) c.push(chip(`Ingresos de fábricas ${pct(m.fabricas)}`, m.fabricas > 1 ? 'pos' : 'neg'));
+  if (m.minas) c.push(chip(`Minas ${pct(m.minas)}`, m.minas > 1 ? 'pos' : 'neg'));
+  if (m.export) c.push(chip(`Exportaciones ${pct(m.export)}`, m.export > 1 ? 'pos' : 'neg'));
+  if (m.construccion) c.push(chip(`Construir ${pct(m.construccion)}`, m.construccion < 1 ? 'pos' : 'neg'));
+  if (m.granjaExtra) c.push(chip(`Granjas +${m.granjaExtra} alimento`, 'pos'));
+  c.push(...chipsModsExtra(m));
+  if (M.estabilidad) c.push(chip(`Estabilidad ${signo(M.estabilidad)}`, clase(M.estabilidad)));
+  for (const g in M.grupos || {}) c.push(chip(`${GRUPOS[g].nombre} ${signo(M.grupos[g])}`, clase(M.grupos[g])));
   return c.join('');
 }
 

@@ -8,8 +8,8 @@
 // ---------- Ejército ----------
 
 const enGuerra = s => Object.keys(s.guerras).length > 0;
-const capacidadTropas = s => 2 + 3 * contarEdificios(s).cuartel + (s.leyes.servicio_militar ? 2 : 0);
-const costeReclutar = s => Math.round(COSTE_TROPA * (s.leyes.servicio_militar ? 0.7 : 1));
+const capacidadTropas = s => 2 + 3 * contarEdificios(s).cuartel + modsPoliticos(s).capacidad;
+const costeReclutar = s => Math.round(COSTE_TROPA * modsPoliticos(s).reclutar);
 // La moral depende de la estabilidad del país: de 0,7 a 1,2.
 const moral = s => 0.7 + s.estabilidad / 200;
 const fuerzaPropia = s => Math.round(s.tropas * moral(s) * 10) / 10;
@@ -108,6 +108,7 @@ function declararGuerra(s, pid, agresor) {
     Object.assign(t.paises[YO()], { tratado: false, alianza: false, relacion: -100 });
     t.tributos = t.tributos.filter(tr => tr.pais !== YO());
     noticia(t, `${mio} os declara la guerra.`, 'mal');
+    suceso(t, 'espadas', `${mio} os declara la guerra`, 'Sus tropas ya marchan hacia la frontera. Refuerza tu ejército en Defensa o búscale una salida negociada.');
   }
   revisarAcuerdos(s);
 }

@@ -9,6 +9,7 @@ const REGLAS = {
   demoler: (s, d) => demoler(s, d.prov, d.tipo),
   prestamo: s => pedirPrestamo(s),
   impuestos: (s, d) => cambiarImpuestos(s, d.v),
+  modelo: (s, d) => cambiarModelo(s, d.v),
 
   // Parlamento y gobierno
   proponer: (s, d) => proponerLey(s, d.ley, d.derogar === '1'),
@@ -16,6 +17,9 @@ const REGLAS = {
   negociar: (s, d) => negociar(s, d.partido),
   votar: s => votar(s),
   cerrarVoto: s => { s.resultadoVoto = null; },
+  // Tu voto, como gobierno, en un pleno que ha abierto otro jugador.
+  plenoVotar: (s, d) => { votarEnPleno(s, ID_JUGADOR, d.v); },
+  cerrarSuceso: s => { if (s.sucesos) s.sucesos.shift(); },
   nombrar: (s, d) => nombrar(s, d.v, d.cand),
   destituir: (s, d) => destituir(s, d.v),
   mitin: (s, d) => darMitin(s, d.v),

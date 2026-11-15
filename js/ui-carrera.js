@@ -51,6 +51,7 @@ function tabCarrera() {
         { a: 'accionCarrera', v: a.id }, puedeAccionCarrera(s, a.id), 'mini')}</div>
     </div>`).join('')}
     <h3>Tu partido en las encuestas</h3>${grafica(s.historial.map(h => h.v), ' escaños', [10, 50])}
+    ${htmlAnuncios()}
     ${htmlCorrupcion()}`;
 }
 
@@ -60,6 +61,7 @@ function tabPartido() {
     .concat(Object.keys(P.afinidad).filter(t => P.afinidad[t] < 0).map(t => chip(`Contra: ${ETIQUETAS[t].toLowerCase()}`, 'neg'))).join('');
   const cab = `<div class="titulo-pais">${logoPartido(P, 'grande')}<div><h2>${esc(P.nombre)}</h2>
     <p class="nota">${s.escanos[ID_JUGADOR]} escaños. ${esLider(s) ? 'Lo diriges tú.' : `Lo dirige ${LIDER_INICIAL}.`}</p></div></div>
+    ${nombreDoctrina(s, ID_JUGADOR) ? `<p class="nota"><b>${nombreDoctrina(s, ID_JUGADOR)}.</b> ${doctrinaGobierno(s).desc} Defiende: ${MODELOS[ORDEN_MODELOS[nivelIdeal(s)]].nombre.toLowerCase()}.</p>` : ''}
     <div class="chips">${ideas || chip('Partido de centro, sin ideas fijas')}</div>
     <p class="nota">Sacar leyes de sus ideas gusta al partido. Las que las contradicen le sientan mal y cuestan más.</p>`;
 

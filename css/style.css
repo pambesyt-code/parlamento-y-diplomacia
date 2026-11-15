@@ -807,3 +807,51 @@ body.con-tutorial main { padding-bottom: calc(var(--alto-tut, 200px) + 32px); }
   #tutorial.en-menu { left: 8px; right: 8px; }
   body.con-tutorial .menu { padding-bottom: calc(var(--alto-tut, 200px) + 28px); }
 }
+
+/* ---------- Versión 2.0: doctrinas, modelo económico y pleno entre jugadores ---------- */
+.doctrinas { display: grid; gap: 9px; }
+.doc-familia > span { display: block; margin-bottom: 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--laton-2); }
+.doc-lista { display: flex; flex-wrap: wrap; gap: 6px; }
+.doc {
+  min-height: 34px; padding: 6px 12px; border: 1.5px solid rgba(240, 233, 212, .3); border-radius: 17px; background: transparent;
+  color: var(--sobre-sala); font-size: 13.5px; font-weight: 600; cursor: pointer;
+  transition: background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out, transform .12s ease-out;
+}
+.doc:hover:not(.activa) { border-color: var(--sobre-sala); background: rgba(240, 233, 212, .07); }
+.doc:active { transform: scale(.96); }
+.doc.activa { background: var(--sobre-sala); border-color: var(--sobre-sala); color: #1b221e; }
+.doc-ficha { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: rgba(240, 233, 212, .07); box-shadow: inset 0 0 0 1px rgba(240, 233, 212, .16); }
+.doc-ficha b { font: 700 16.5px var(--titulo); color: var(--sobre-sala); }
+.doc-ficha p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.4; color: var(--sobre-sala-2); }
+.doc-ficha .doc-rasgo { display: flex; align-items: flex-start; gap: 7px; color: var(--laton-2); }
+.doc-rasgo .ico { flex: none; width: 15px; height: 15px; margin-top: 2px; }
+.segmento.cinco button { padding: 7px 6px; font-size: 12.5px; line-height: 1.2; white-space: normal; text-align: center; }
+.resumen-ideario .chips { margin: 0 0 6px; }
+
+.niveles.modelos { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+.niveles.modelos .nivel { min-width: 0; }
+.niveles.modelos .nivel b { font-size: 13.5px; line-height: 1.2; }
+.nivel .ideal { font-weight: 700; color: var(--pos); }
+
+.intencion.pend { color: var(--laton-sombra); }
+.vp .intencion.pend { opacity: 1; }
+.pleno-abierto .voto-partidos { margin: 8px 0 2px; }
+.v-pleno .voto-partidos { padding: 8px 10px; border-radius: 6px; background: var(--marfil-2); box-shadow: inset 0 0 0 1px var(--linea); }
+.v-pleno .opcion .chips { margin: 5px 0 0; }
+
+/* Idioma */
+.idiomas { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 14px; }
+.idiomas button {
+  min-height: 34px; padding: 5px 11px; border: 1.5px solid rgba(240, 233, 212, .28); border-radius: 17px; background: transparent;
+  color: var(--sobre-sala-2); font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out, transform .12s ease-out;
+}
+.idiomas button:hover:not(.activa) { border-color: var(--sobre-sala); color: var(--sobre-sala); }
+.idiomas button:active { transform: scale(.96); }
+.idiomas button.activa { background: var(--sobre-sala); border-color: var(--sobre-sala); color: #1b221e; }
+.segmento.idioma { flex-wrap: wrap; }
+
+@media (max-width: 760px) {
+  .segmento.cinco { display: grid; grid-template-columns: 1fr 1fr; }
+  .v-pleno .voto-partidos { grid-template-columns: 1fr; }
+}

@@ -44,7 +44,8 @@ function miToken() {
 const codigoAlAzar = () => Array.from({ length: 5 }, () => LETRAS_CODIGO[Math.floor(Math.random() * LETRAS_CODIGO.length)]).join('');
 const perfilDe = c => ({
   lider: c.lider, propio: c.propio, partidoId: c.partidoId, partido: c.partido, color: c.color, emblema: c.emblema,
-  principios: [...c.principios], pais: c.pais, colorPais: c.colorPais, nacion: c.nacion || null,
+  principios: [...c.principios], doctrina: c.doctrina, intervencion: c.intervencion,
+  pais: c.pais, colorPais: c.colorPais, nacion: c.nacion || null,
 });
 
 function errorRed(texto) {
@@ -285,9 +286,18 @@ function aplicarAccion(j, a, d) {
   if (!s || s.fin || a === 'mes') return;
   const gobierna = !s.tokenGobierno || s.tokenGobierno === j.token, o = opositorPorToken(s, j.token);
   if (gobierna ? !REGLAS[a] : !(o && REGLAS_OPOSICION[a])) return;
+  const plenoAntes = s.pleno;
   try {
     usarNacion(s);
     if (gobierna) REGLAS[a](s, d); else REGLAS_OPOSICION[a](s, o, d);
+    // Si se abre una votación, quienes tienen que votar dejan de estar «listos»: el mes los espera.
+    if (s.pleno && s.pleno !== plenoAntes) {
+      for (const x of RED.sala.jugadores) {
+        if (x.nacion !== s.nacion) continue;
+        const ox = opositorPorToken(s, x.token), partido = ox ? ox.partido : s.tokenGobierno === x.token ? huecoDe(s.config) : null;
+        if (partido && s.pleno.pendientes.includes(partido)) x.listo = false;
+      }
+    }
     sincronizarNaciones(ESTADOS);
   } catch (e) {
     console.error('Error al aplicar', a, e);
@@ -386,6 +396,7 @@ function reanudarSala(g) {
   prepararMundo(RED.sala.config, 0, comun.duenos);
   for (const k in ESTADOS) delete ESTADOS[k];
   for (const s of lista) {
+    migrarNacion(s);
     Object.assign(s, { mundo: comun.mundo, duenos: comun.duenos, ocupadas: comun.ocupadas });
     ESTADOS[s.nacion] = s;
     registrarHumano(s.nacion, s.config);

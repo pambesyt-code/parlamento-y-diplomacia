@@ -77,7 +77,14 @@ function htmlMenuPrincipal() {
       ${botonMenu({ a: 'abrir', v: 'ayuda' }, 'ayuda', 'Cómo se juega')}
       ${botonMenu({ a: 'abrir', v: 'opciones' }, 'engranaje', 'Opciones')}
     </nav>
+    ${htmlIdiomas()}
     <p class="menu-pie">Versión ${VERSION}</p>`;
+}
+
+// Botones para cambiar de idioma. Los nombres van en su propio idioma: no se traducen.
+function htmlIdiomas() {
+  return `<div class="idiomas" role="group" aria-label="Idioma" translate="no">${ORDEN_IDIOMAS.map(id =>
+    `<button class="${opciones.idioma === id ? 'activa' : ''}" data-a="opcion" data-k="idioma" data-v="${id}" aria-pressed="${opciones.idioma === id}" lang="${id}">${IDIOMAS[id]}</button>`).join('')}</div>`;
 }
 
 // ---------- Partida nueva, en tres pasos ----------
@@ -109,14 +116,9 @@ function pasoPartido(c) {
       ${Object.keys(CATALOGO_PARTIDOS).map(pid => {
         const P = CATALOGO_PARTIDOS[pid], ideas = Object.keys(P.afinidad).filter(t => P.afinidad[t] > 0).map(t => ETIQUETAS[t]).join(', ') || 'Centro';
         return `<button class="partido-op ${c.partidoId === pid ? 'activa' : ''}" data-a="cfg" data-k="partidoId" data-v="${pid}" aria-pressed="${c.partidoId === pid}">
-          ${logoPartido(P)}<span><b>${P.nombre}</b><small>${P.lema}</small><small>Le gustan las leyes de: ${ideas}</small></span></button>`;
+          ${logoPartido(P)}<span><b>${P.nombre}</b><small>${DOCTRINAS[P.doctrina].nombre}. ${P.lema}</small><small>Le gustan las leyes de: ${ideas}</small></span></button>`;
       }).join('')}</div></div>`;
   }
-  const favorece = g => c.principios.reduce((a, t) => a + (PRINCIPIOS[t].grupos[g] || 0), 0);
-  const tiron = Object.keys(GRUPOS).map(g => {
-    const v = favorece(g);
-    return v ? chip(`${GRUPOS[g].nombre}: ${v > 0 ? 'más' : 'menos'} tirón`, v > 0 ? 'pos' : 'neg') : '';
-  }).join('');
   return `${eleccion}
     <div class="vista-partido">${logoPartido({ color: c.color, emblema: c.emblema }, 'grande')}
       <div><b id="vp-partido">${esc(c.partido)}</b><span id="vp-lider">Lo lidera ${esc(c.lider)}</span></div></div>
@@ -129,15 +131,40 @@ function pasoPartido(c) {
     <div class="campo"><span>Emblema</span><div class="opciones-fila">
       ${EMBLEMAS.map(e => `<button class="muestra emblema ${e === c.emblema ? 'activa' : ''}" data-a="cfg" data-k="emblema" data-v="${e}" aria-label="Emblema ${e}" aria-pressed="${e === c.emblema}">${ico(e)}</button>`).join('')}
     </div></div>
-    <div class="campo"><span>Ideología: hasta ${MAX_PRINCIPIOS} principios, o ninguno si es de centro</span><div class="principios">
-      ${Object.keys(PRINCIPIOS).map(t => {
+    ${htmlIdeario(c)}`;
+}
+
+// Las ideas del partido que creas: su doctrina, cuánto Estado defiende y hasta dos causas más.
+function htmlIdeario(c) {
+  const D = DOCTRINAS[c.doctrina] || DOCTRINAS[DOCTRINA_BASE], nivel = nivelIntervencion(c);
+  const familias = Object.keys(FAMILIAS_DOCTRINA).map(f => `<div class="doc-familia"><span>${FAMILIAS_DOCTRINA[f]}</span><div class="doc-lista">
+    ${Object.keys(DOCTRINAS).filter(id => DOCTRINAS[id].familia === f).map(id => `<button class="doc ${D === DOCTRINAS[id] ? 'activa' : ''}" data-a="cfg" data-k="doctrina" data-v="${id}" aria-pressed="${D === DOCTRINAS[id]}">${DOCTRINAS[id].nombre}</button>`).join('')}
+    </div></div>`).join('');
+  const causas = Object.keys(PRINCIPIOS).filter(t => !PRINCIPIOS[t].oculto);
+  // Resumen de lo que sale de todo lo elegido: qué leyes le gustan y entre quién tiene tirón.
+  const a = afinidadPerfil(c), tiron = tironPerfil(c);
+  const gusta = Object.keys(a).filter(t => a[t] > 0).map(t => ETIQUETAS[t]).join(', ');
+  const rechaza = Object.keys(a).filter(t => a[t] < 0).map(t => ETIQUETAS[t]).join(', ');
+  const chipsTiron = Object.keys(GRUPOS).map(g => (tiron[g] >= 1.12 ? chip(`${GRUPOS[g].nombre}: más tirón`, 'pos') : tiron[g] <= 0.88 ? chip(`${GRUPOS[g].nombre}: menos tirón`, 'neg') : '')).join('');
+  return `<div class="campo"><span>Doctrina: las ideas de fondo de tu partido</span>
+      <div class="doctrinas">${familias}</div>
+      <div class="doc-ficha"><b>${D.nombre}</b><p>${D.desc}</p>
+        <p class="doc-rasgo">${ico('estrella')}<span>Cuando gobiernes: ${D.rasgo.texto}</span></p></div></div>
+    <div class="campo"><span>Cuánto debe intervenir el Estado en la economía</span>
+      <div class="segmento oscuro cinco">${ORDEN_MODELOS.map((m, i) => `<button class="${nivel === i ? 'activa' : ''}" data-a="cfg" data-k="intervencion" data-v="${i}" aria-pressed="${nivel === i}">${MODELOS[m].nombre}</button>`).join('')}</div>
+      <p class="campo-nota">${MODELOS[ORDEN_MODELOS[nivel]].desc} ${nivel === D.intervencion ? 'Es lo que suele defender esta doctrina.' : 'Te apartas de lo que suele defender esta doctrina.'}
+        Si llegas al gobierno, tus votantes esperarán que apliques este modelo.</p></div>
+    <div class="campo"><span>Causas: hasta ${MAX_PRINCIPIOS} banderas más, o ninguna</span><div class="principios">
+      ${causas.map(t => {
         const activo = c.principios.includes(t), opuesto = PRINCIPIOS[t].opuesto;
         const bloqueado = !activo && (c.principios.length >= MAX_PRINCIPIOS || c.principios.includes(opuesto));
         return `<button class="principio ${activo ? 'activa' : ''}" data-a="cfgPrincipio" data-v="${t}" aria-pressed="${activo}" ${bloqueado ? 'disabled' : ''}>
           <b>${ETIQUETAS[t]}</b><small>${PRINCIPIOS[t].desc}</small></button>`;
-      }).join('')}</div>
-      <div class="chips">${tiron || chip('Sin principios: igual de tirón en todos los grupos')}</div>
-      <p class="campo-nota">Las leyes de tus principios te salen más fáciles en el partido. Las que los contradicen cuestan 1 de capital político más.</p></div>`;
+      }).join('')}</div></div>
+    <div class="campo resumen-ideario"><span>Así queda tu partido</span>
+      <div class="chips">${gusta ? chip(`Le gustan las leyes de: ${gusta}`, 'pos') : chip('Sin leyes favoritas')}${rechaza ? chip(`Rechaza las de: ${rechaza}`, 'neg') : ''}</div>
+      <div class="chips">${chipsTiron || chip('El mismo tirón en todos los grupos')}</div>
+      <p class="campo-nota">Las leyes que encajan con tus ideas gustan a tu partido. Las que las contradicen cuestan 1 de capital político más.</p></div>`;
 }
 
 function pasoPais(c) {
@@ -203,6 +230,7 @@ function segmento(k, etiqueta, valores) {
 function htmlOpciones() {
   const enJuego = ui.pantalla === 'juego';
   return `<h2>${ico('engranaje')} Opciones</h2>
+    <div class="op-fila"><span>Idioma</span>${htmlIdiomas().replace('class="idiomas"', 'class="segmento idioma"')}</div>
     ${segmento('tema', 'Aspecto', { claro: `${ico('sol')} Sala`, oscuro: `${ico('luna')} Noche` })}
     ${segmento('texto', 'Tamaño del texto', { normal: 'Normal', grande: 'Grande' })}
     ${interruptor('animaciones', 'Animaciones')}
@@ -213,6 +241,8 @@ function htmlOpciones() {
     ${interruptor('avisos', 'Avisos emergentes')}
     ${interruptor('rotulos', 'Nombres de provincias en el mapa')}
     <div class="op-partida">
+      <button class="btn" data-a="abrir" data-v="privacidad">${ico('periodico')} Política de privacidad</button>
+      ${EN_APP ? `<button class="btn" data-a="preferenciasAnuncios">${ico('megafono')} Preferencias de anuncios</button>` : ''}
       ${enJuego && enRed() ? `<button class="btn" data-a="salirMenu">${ico('casa')} ${soyAnfitrion() ? 'Cerrar la sala y salir (se guarda para reanudarla)' : 'Salir de la partida'}</button>`
       : enJuego && enTutorial() ? `<button class="btn" data-a="tutSalir">${ico('casa')} Salir del tutorial</button>`
       : enJuego ? `<button class="btn" data-a="salirMenu">${ico('casa')} Guardar y salir al menú</button>
@@ -246,6 +276,7 @@ function htmlAyuda(esIntro) {
     <ul class="ayuda">
       ${punto('martillo', 'Construye', 'Pulsa una provincia y levanta granjas, minas, fábricas, puertos y más.')}
       ${punto('parlamento', 'Aprueba leyes', 'Necesitas más votos a favor que en contra. Negocia con los otros partidos.')}
+      ${punto('balanza', 'Elige tu modelo económico', 'En Economía decides cuánto interviene el Estado. Tus votantes esperan el que defiende tu partido.')}
       ${punto('maletin', 'Forma gobierno', 'Cada ministro da una ventaja. Uno de otro partido te acerca a ese partido.')}
       ${punto('gente', 'Cuida a la gente', 'El apoyo de obreros, empresarios, campesinos y jóvenes decide tus escaños.')}
       ${punto('bandera', 'Haz diplomacia', 'Tratados y alianzas con los vecinos dan dinero, estabilidad e influencia.')}

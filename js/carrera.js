@@ -10,11 +10,14 @@ const apoyoCongreso = s => Math.round(s.carrera.interno + s.carrera.prestigio / 
 // La fama se olvida: cada mes pierdes una parte de tu prestigio, más cuanto más tienes.
 const olvidoPrestigio = s => Math.ceil(s.carrera.prestigio * 0.08);
 const accionesCarrera = s => ACCIONES_CARRERA.filter(a => !a.fase || a.fase === s.carrera.cargo);
+// El modelo económico que aplica un partido de la IA cuando gobierna: el que defiende.
+const modeloDePartido = pid => ORDEN_MODELOS[(CATALOGO_PARTIDOS[pid] || { intervencion: 2 }).intervencion];
 
 function iniciarCarrera(s) {
   const dif = dificultad(s);
   s.modo = 'carrera';
   s.gobiernoIA = ID_JUGADOR === 'ac' ? 'fo' : 'ac';
+  s.modelo = modeloDePartido(s.gobiernoIA);
   s.carrera = {
     cargo: 'diputado', prestigio: 5, interno: dif.interno, fondos: 60, apoyoLider: dif.apoyoLider,
     imagen: {}, promesas: [], hechas: {}, propias: {}, congresoMes: MES_CONGRESO, intentos: 0, mesLider: -1,
@@ -83,10 +86,10 @@ function objetivoGrupoCarrera(s, g) {
 // ---------- Programa electoral ----------
 
 function puedePrometer(s, leyId) {
-  const c = s.carrera, ley = LEY_POR_ID[leyId];
+  const c = s.carrera;
   if (c.promesas.includes(leyId)) return { ok: false, motivo: 'Ya está en tu programa' };
   if (c.promesas.length >= MAX_PROMESAS) return { ok: false, motivo: 'El programa está completo' };
-  if (ley.incompatible && c.promesas.includes(ley.incompatible)) return { ok: false, motivo: 'Choca con otra promesa' };
+  if (INCOMPATIBLES[leyId].some(id => c.promesas.includes(id))) return { ok: false, motivo: 'Choca con otra promesa' };
   if (s.cp < 1) return { ok: false, motivo: 'Sin capital político' };
   return { ok: true };
 }
@@ -151,7 +154,7 @@ function elegirLeyGobierno(s) {
   const afinidad = l => l.tags.reduce((a, t) => a + (P.afinidad[t] || 0), 0);
   const opciones = [];
   for (const l of LEYES) {
-    if (!s.leyes[l.id] && afinidad(l) >= 2 && !(l.incompatible && s.leyes[l.incompatible])) opciones.push({ ley: l.id, derogar: false });
+    if (!s.leyes[l.id] && afinidad(l) >= 2 && !leyQueChoca(s, l.id)) opciones.push({ ley: l.id, derogar: false });
     if (s.leyes[l.id] && afinidad(l) <= -2) opciones.push({ ley: l.id, derogar: true });
   }
   return opciones.length ? alAzar(opciones) : null;
@@ -247,6 +250,7 @@ function eleccionesCarrera(s) {
   if (esLider(s) && c.interno < 35) { perderLiderazgo(s); s.elecciones.destituido = true; }
   const rivales = Object.keys(escanos).filter(pid => pid !== ID_JUGADOR);
   s.gobiernoIA = rivales.reduce((a, b) => (escanos[b] > escanos[a] ? b : a));
+  s.modelo = modeloDePartido(s.gobiernoIA);
   c.fuerzaGobierno = dificultad(s).fuerzaGobierno - 0.1;
   c.promesas = [];
   s.legislatura++;
@@ -270,6 +274,8 @@ function formarGobierno(s) {
   s.ultimoMitin = -1;
   s.recientes = [];
   s.directiva = null;
+  // Heredas el modelo económico del gobierno anterior y puedes cambiarlo desde el primer día.
+  s.modeloMes = -99;
   s.promesas = c.promesas.map(ley => ({ ley, limite: s.mes + 12, estado: s.leyes[ley] ? 'cumplida' : 'pendiente' }));
   s.historial = [puntoHistorial(s)];
   noticia(s, `${s.config.lider} forma gobierno tras ganar las elecciones.`, 'bien');
