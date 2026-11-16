@@ -84,6 +84,34 @@ const ICONOS = {
   antorcha: '<path d="M10.300 12h3.400l-.900 9h-1.600zM12 3c2.200 2 3.200 3.600 3.200 5.200a3.200 3.200 0 0 1-6.400 0c0-1 .500-2 1.400-3 .300 1.100.800 1.600 1.500 1.600.500-1.200.600-2.400.300-3.800z"/>',
   balanza: '<path d="M12 4v16M8 20h8M5.500 7h13M5.500 7L3 13.500a2.600 2.600 0 0 0 5 0zM18.500 7L16 13.500a2.600 2.600 0 0 0 5 0z"/>',
   faro: '<path d="M9.500 21l1.200-11h2.600l1.200 11M8 21h8M10 10V7.500h4V10M12 7.500V5M5.500 6l3 1.200M18.500 6l-3 1.200"/>',
+  corazon: '<path d="M12 20.500s-8-4.900-8-10.700A4.300 4.300 0 0 1 12 7.600a4.300 4.300 0 0 1 8 2.200c0 5.800-8 10.700-8 10.700z"/>',
+  rayo: '<path d="M13.500 3L5.500 13.500H11L10 21l8.500-11H13z"/>',
+  arbol: '<path d="M12 21v-5M12 3.500l5 6.500h-2.500l4 6h-13l4-6H7z"/>',
+  montana: '<path d="M2.500 19.500L9 7.500l4.200 7.300 2.300-3.300 6 8zM6.800 11.500l2.200 1.700 2-1.900"/>',
+  ola: '<path d="M3 9c2-2.600 4-2.600 6 0s4 2.600 6 0 4-2.600 6 0M3 15.500c2-2.600 4-2.600 6 0s4 2.600 6 0 4-2.600 6 0"/>',
+  flechaArriba: '<path d="M12 20.500V4M5.500 10.500L12 4l6.500 6.500"/>',
+  cruz: '<path d="M12 3.500v17M7 8.500h10"/>',
+  flor: `<circle cx="12" cy="12" r="2.400"/>${[0, 1, 2, 3, 4, 5].map(k => `<circle cx="${(12 + 5.4 * Math.cos(k * Math.PI / 3)).toFixed(2)}" cy="${(12 + 5.4 * Math.sin(k * Math.PI / 3)).toFixed(2)}" r="2.800"/>`).join('')}`,
+  llama: '<path d="M12 3c3.500 3.500 6 6.500 6 10.500a6 6 0 0 1-12 0c0-2 .800-3.700 2.200-5.300.500 1.800 1.300 2.700 2.300 2.800C11.500 8.500 12 6 12 3z"/>',
+  puente: '<path d="M3 17h18M5.500 17V7.500M18.500 17V7.500M5.500 8.500c2.500 5 10.500 5 13 0M9 17v-5.300M12 17v-4.700M15 17v-5.300"/>',
+  libro: '<path d="M12 6.500C10 5 7 4.500 3.500 5v13.500c3.500-.500 6.500 0 8.500 1.500 2-1.500 5-2 8.500-1.500V5C17 4.500 14 5 12 6.500zM12 6.500V20"/>',
+  ojo: '<path d="M2.500 12C5 7.500 8.300 5.500 12 5.500s7 2 9.500 6.500c-2.500 4.500-5.800 6.500-9.500 6.500S5 16.500 2.500 12z"/><circle cx="12" cy="12" r="3"/>',
+  puno: '<path d="M7.500 11V7.500a1.500 1.500 0 0 1 3 0V6.300a1.500 1.500 0 0 1 3 0v1a1.500 1.500 0 0 1 3 0v3.200a1.500 1.500 0 0 1 1.500 1.500v2.500c0 2.300-1 3.700-2.500 4.500v2h-6v-2c-1.500-.800-2-2-2-4zM10.500 7.500V11M13.500 7.300V11M16.500 10.500H13a1.500 1.500 0 0 0 0 3h1"/>',
+  tulipan: '<path d="M12 21v-8M12 13c-3 0-4.500-2-4.500-5V4.500L10 6.500l2-3 2 3 2.500-2V8c0 3-1.500 5-4.500 5zM12 19c-1.300-2-2.800-2.800-5-3M12 19c1.300-2 2.800-2.800 5-3"/>',
+  triangulo: '<path d="M12 4l9 15.500H3z"/>',
+  anillos: '<circle cx="9" cy="12" r="5.500"/><circle cx="15" cy="12" r="5.500"/>',
+  atomo: '<circle cx="12" cy="12" r="1.500"/><ellipse cx="12" cy="12" rx="9.300" ry="3.700"/><ellipse cx="12" cy="12" rx="9.300" ry="3.700" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.300" ry="3.700" transform="rotate(120 12 12)"/>',
+  cohete: '<path d="M12 3c3 2.500 4.500 6 4.500 10v3h-9v-3C7.500 9 9 5.500 12 3zM7.500 13.500L5 17v3l2.500-1.500M16.500 13.500L19 17v3l-2.500-1.500M10.500 19l1.500 2.500 1.500-2.500"/><circle cx="12" cy="9.500" r="1.600"/>',
+  rombo: '<path d="M12 3l8 9-8 9-8-9z"/>',
+  paz: '<circle cx="12" cy="12" r="8.500"/><path d="M12 3.500v17M12 12l-6 6M12 12l6 6"/>',
+  infinito: '<path d="M12 12c-2-3-3.500-4.500-5.500-4.500a4.500 4.500 0 0 0 0 9c2 0 3.500-1.500 5.500-4.500zm0 0c2 3 3.500 4.500 5.500 4.500a4.500 4.500 0 0 0 0-9c-2 0-3.500 1.500-5.500 4.500z"/>',
+  campana: '<path d="M5.500 17h13l-1.500-2.500V11a5 5 0 0 0-10 0v3.500zM10.500 19.500a1.500 1.500 0 0 0 3 0M12 4v2"/>',
+  gota: '<path d="M12 3.500c3.500 4.500 6 7.500 6 10.500a6 6 0 0 1-12 0c0-3 2.500-6 6-10.500z"/>',
+  pluma: '<path d="M4.500 19.500L14 10M19.500 4.500c-7 0-11.500 3.500-12.500 10.500l-.500 2.500 2.500-.500c7-1 10.500-5.500 10.500-12.500zM9.500 14.500H14"/>',
+  asterisco: '<path d="M12 3.500v17M4.600 7.800l14.800 8.400M4.600 16.200l14.800-8.400"/>',
+  brujula: '<circle cx="12" cy="12" r="8.500"/><path d="M15.800 8.200l-2.300 5.300-5.300 2.300 2.300-5.300z"/>',
+  cubo: '<path d="M12 3.500l7.500 4.200v8.600L12 20.500l-7.500-4.200V7.700zM4.500 7.700L12 12l7.500-4.300M12 12v8.500"/>',
+  tridente: '<path d="M12 21V4M6.500 4.500V9a5.500 5.500 0 0 0 11 0V4.500M9.500 16.500h5M10.300 5.700L12 4l1.700 1.700"/>',
 };
 
 function ico(nombre, cls = '') {
@@ -96,16 +124,35 @@ const banderaJugador = color => `<rect width="21" height="14" fill="${color}"/><
 
 function dibujoBandera(id) {
   if (id !== PAIS_JUGADOR.id) return (PAISES[id] && PAISES[id].bandera) || '';
-  return banderaJugador(PAIS_JUGADOR.colores[0]);
+  // En el mapa de Europa tu país lleva su bandera de verdad.
+  return (NACIONES[id] && NACIONES[id].banderaFija) || banderaJugador(PAIS_JUGADOR.colores[0]);
 }
 
 function bandera(id, cls = '') {
   return `<svg class="bandera ${cls}" viewBox="0 0 21 14" aria-hidden="true">${dibujoBandera(id)}</svg>`;
 }
 
-// Insignia redonda de un partido: su color de fondo y su emblema en claro.
+// Cómo se reparten los dos colores de una insignia.
+const FONDOS_CSS = {
+  liso: a => a,
+  mitades: (a, b) => `linear-gradient(90deg,${a} 50%,${b} 50%)`,
+  diagonal: (a, b) => `linear-gradient(135deg,${a} 50%,${b} 50%)`,
+  franja: (a, b) => `linear-gradient(180deg,${a} 34%,${b} 34% 66%,${a} 66%)`,
+  aro: (a, b) => `radial-gradient(circle,${a} 55%,${b} 57%)`,
+};
+
+// Insignia de un partido: su forma, sus colores y su símbolo (o sus letras).
+// Lo que llega puede venir de otro jugador, así que aquí se comprueba todo antes de pintarlo.
 function logoPartido(info, cls = '') {
-  return `<span class="logo ${cls}" style="background:${info.color}">${ico(info.emblema)}</span>`;
+  const c1 = ES_COLOR.test(info.color) ? info.color : '#888888', c2 = ES_COLOR.test(info.color2) ? info.color2 : '#ffffff';
+  const tinta = ES_COLOR.test(info.colorSimbolo) ? info.colorSimbolo : '#ffffff';
+  const fondo = (FONDOS_CSS[info.fondo] || FONDOS_CSS.liso)(c1, c2);
+  const forma = FORMAS_INSIGNIA[info.insignia] ? info.insignia : 'circulo';
+  const letras = limpiarLetras(info.letras);
+  const dentro = letras
+    ? `<svg class="ico letras" viewBox="0 0 24 24" aria-hidden="true" translate="no"><text x="12" y="12.500" text-anchor="middle" dominant-baseline="central" font-size="${[0, 19, 14, 10][letras.length]}">${letras}</text></svg>`
+    : ico(info.emblema);
+  return `<span class="logo f-${forma} ${cls}" style="background:${fondo};color:${tinta}">${dentro}</span>`;
 }
 
 // Emblema del juego: un hemiciclo de escaños bajo una estrella.

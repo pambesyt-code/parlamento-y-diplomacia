@@ -27,10 +27,10 @@ function heroHemiciclo(colorCentro) {
 
 // Vista previa del mundo que saldrá con la semilla y el tamaño elegidos.
 function vistaMundo() {
-  const c = ui.cfg, clave = `${c.semilla}|${c.tamano}|${c.colorPais}`;
+  const c = ui.cfg, clave = `${c.semilla}|${c.tamano}|${c.colorPais}|${c.paisEuropa}`;
   if (ui.vistaClave !== clave) {
     PAIS_JUGADOR.colores = tonosPais(c.colorPais);
-    generarMundo(c.semilla, c.tamano);
+    generarMundo(c.semilla, c.tamano, 1, c.paisEuropa);
     ui.vistaClave = clave;
     ui.salaMundo = null;
   }
@@ -130,7 +130,7 @@ function pasoPartido(c) {
 // Nombre, color, emblema e ideas del partido que creas.
 function htmlPartidoPropio(c) {
   return `
-    <div class="vista-partido">${logoPartido({ color: c.color, emblema: c.emblema }, 'grande')}
+    <div class="vista-partido">${logoPartido(c, 'grande')}
       <div><b id="vp-partido">${esc(c.partido)}</b><span id="vp-lider">Lo lidera ${esc(c.lider)}</span></div></div>
     <label class="campo"><span>Nombre del partido</span><input id="cfg-partido" maxlength="28" value="${esc(c.partido)}" autocomplete="off"></label>
     <div class="campo"><span>Color</span><div class="opciones-fila">
@@ -138,10 +138,43 @@ function htmlPartidoPropio(c) {
       <label class="muestra libre ${COLORES_PARTIDO.includes(c.color) ? '' : 'activa'}" title="Cualquier color" style="background:${COLORES_PARTIDO.includes(c.color) ? 'conic-gradient(#e44,#ee4,#4e4,#4ee,#44e,#e4e,#e44)' : c.color}">
         <input type="color" id="cfg-color" value="${c.color}" aria-label="Elegir cualquier color"></label>
     </div><p class="campo-nota">El último cuadro abre la paleta para elegir el color que quieras.</p></div>
-    <div class="campo"><span>Emblema</span><div class="opciones-fila">
-      ${EMBLEMAS.map(e => `<button class="muestra emblema ${e === c.emblema ? 'activa' : ''}" data-a="cfg" data-k="emblema" data-v="${e}" aria-label="Emblema ${e}" aria-pressed="${e === c.emblema}">${ico(e)}</button>`).join('')}
-    </div></div>
+    ${htmlDisenoInsignia(c)}
     ${htmlIdeario(c)}`;
+}
+
+// Un cuadro de la paleta que abre el selector de color del navegador.
+function muestraLibre(id, color, fijos, nombre) {
+  const libre = !fijos.includes(color);
+  return `<label class="muestra libre ${libre ? 'activa' : ''}" title="Cualquier color" style="background:${libre ? color : 'conic-gradient(#e44,#ee4,#4e4,#4ee,#44e,#e4e,#e44)'}">
+    <input type="color" id="${id}" value="${color}" aria-label="${nombre}"></label>`;
+}
+
+// La insignia del partido: forma, reparto de colores, símbolo (o letras) y su color.
+function htmlDisenoInsignia(c) {
+  const muestras = (k, lista, actual) => lista.map(col => `<button class="muestra ${col === actual ? 'activa' : ''}" data-a="cfg" data-k="${k}" data-v="${col}" style="background:${col}" aria-label="Color ${col}" aria-pressed="${col === actual}"></button>`).join('');
+  return `<div class="campo"><span>Forma de la insignia</span><div class="opciones-fila">
+      ${Object.keys(FORMAS_INSIGNIA).map(f => `<button class="muestra emblema ${f === c.insignia ? 'activa' : ''}" data-a="cfg" data-k="insignia" data-v="${f}" title="${FORMAS_INSIGNIA[f]}" aria-label="${FORMAS_INSIGNIA[f]}" aria-pressed="${f === c.insignia}"><i class="forma-muestra f-${f}"></i></button>`).join('')}
+    </div></div>
+    <div class="campo"><span>Fondo</span><div class="opciones-fila">
+      ${Object.keys(FONDOS_INSIGNIA).map(f => `<button class="muestra ${f === c.fondo ? 'activa' : ''}" data-a="cfg" data-k="fondo" data-v="${f}" style="background:${FONDOS_CSS[f](c.color, c.color2)}" title="${FONDOS_INSIGNIA[f]}" aria-label="${FONDOS_INSIGNIA[f]}" aria-pressed="${f === c.fondo}"></button>`).join('')}
+    </div></div>
+    ${c.fondo === 'liso' ? '' : `<div class="campo"><span>Segundo color</span><div class="opciones-fila">
+      ${muestras('color2', COLORES_SEGUNDO, c.color2)}${muestraLibre('cfg-color2', c.color2, COLORES_SEGUNDO, 'Elegir el segundo color')}</div></div>`}
+    <div class="campo"><span>Símbolo</span><div class="opciones-fila emblemas">
+      ${EMBLEMAS.map(e => `<button class="muestra emblema ${e === c.emblema && !c.letras ? 'activa' : ''}" data-a="cfgEmblema" data-v="${e}" aria-label="Símbolo" aria-pressed="${e === c.emblema}">${ico(e)}</button>`).join('')}
+    </div></div>
+    <label class="campo"><span>O escribe letras en la insignia</span><input id="cfg-letras" maxlength="${MAX_LETRAS_EMBLEMA}" value="${esc(c.letras || '')}" placeholder="ABC" autocomplete="off" autocapitalize="characters" translate="no">
+      <p class="campo-nota">Hasta ${MAX_LETRAS_EMBLEMA} letras o números. Si escribes algo, sustituye al símbolo; bórralo para volver a él.</p></label>
+    <div class="campo"><span>Color del símbolo</span><div class="opciones-fila">
+      ${muestras('colorSimbolo', COLORES_SIMBOLO, c.colorSimbolo)}${muestraLibre('cfg-color3', c.colorSimbolo, COLORES_SIMBOLO, 'Elegir el color del símbolo')}</div></div>`;
+}
+
+// En el mapa secreto de Europa eliges qué país llevas.
+function htmlPaisesEuropa(c) {
+  return `<div class="campo"><span>Tu país en Europa</span><div class="paises-europa">
+      ${paisesEuropa().map(P => `<button class="pais-eu ${P.id === c.paisEuropa ? 'activa' : ''}" data-a="cfgEuropa" data-v="${P.id}" aria-pressed="${P.id === c.paisEuropa}">
+        <svg class="bandera" viewBox="0 0 21 14" aria-hidden="true">${P.bandera}</svg><span>${P.nombre}</span><small>${P.provincias}</small></button>`).join('')}
+    </div><p class="campo-nota">Has encontrado el mapa secreto. El número de cada país son sus provincias: con muy pocas, la partida es mucho más difícil.</p></div>`;
 }
 
 // Las ideas del partido que creas: su doctrina, cuánto Estado defiende y hasta dos causas más.
@@ -190,12 +223,12 @@ function pasoPais(c) {
       ${COLORES_PAIS.map(col => `<button class="muestra ${col === c.colorPais ? 'activa' : ''}" data-a="cfg" data-k="colorPais" data-v="${col}" style="background:${col}" aria-label="Color ${col}" aria-pressed="${col === c.colorPais}"></button>`).join('')}
     </div></div>
     <div class="campo"><span>Forma del Estado</span>${tarjetasOpcion('estado', FORMAS_ESTADO, c.estado, 'dos')}</div>
-    <div class="campo"><span>Tamaño del mundo</span>${tarjetasOpcion('tamano', TAMANOS, c.tamano)}</div>
+    ${esEuropa(c.semilla) ? htmlPaisesEuropa(c) : `<div class="campo"><span>Tamaño del mundo</span>${tarjetasOpcion('tamano', TAMANOS, c.tamano)}</div>`}
     <div class="campo"><span>Partidos en el parlamento</span><div class="segmento oscuro">
       ${Object.keys(NUM_PARTIDOS).map(n => `<button class="${+c.nPartidos === +n ? 'activa' : ''}" data-a="cfg" data-k="nPartidos" data-v="${n}" aria-pressed="${+c.nPartidos === +n}">${n} · ${NUM_PARTIDOS[n]}</button>`).join('')}
     </div><p class="campo-nota">Cada partida salen partidos distintos, con fuerzas distintas. Con más partidos el voto se reparte más y hay que pactar más.</p></div>
     <div class="campo"><span>Mapa: cada número da un mundo distinto</span><div class="semilla">
-      <input id="cfg-semilla" inputmode="numeric" maxlength="7" value="${c.semilla}" aria-label="Número del mapa">
+      <input id="cfg-semilla" maxlength="7" value="${c.semilla}" aria-label="Número del mapa" autocomplete="off" autocapitalize="characters" translate="no">
       <button class="btn claro" data-a="otroMapa">${ico('mapa')} Generar otro</button></div></div>`;
 }
 

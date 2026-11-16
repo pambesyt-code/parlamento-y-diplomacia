@@ -1,7 +1,7 @@
 'use strict';
 // Datos del juego: todo lo que se puede equilibrar o ampliar sin tocar las reglas.
 
-const VERSION = '2.1';
+const VERSION = '2.2';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const ANIO_INICIAL = 2030;
 const CP_MAXIMO = 10;
@@ -515,7 +515,21 @@ const NUM_PARTIDOS = { 4: 'Pocos', 6: 'Normal', 8: 'Muchos', 10: 'Fragmentado' }
 const PARTIDOS = {};
 const ORDEN_HEMICICLO = [];
 const COLORES_PARTIDO = ['#c9902b', '#2a9d8f', '#7b4fa6', '#de6b35', '#c9478b'];
-const EMBLEMAS = ['sol', 'estrella', 'antorcha', 'balanza', 'faro'];
+const EMBLEMAS = ['sol', 'estrella', 'antorcha', 'balanza', 'faro', 'hoja', 'engranaje', 'torre', 'escudo', 'megafono', 'globo', 'bombilla',
+  'gente', 'martillo', 'ancla', 'diana', 'charla', 'grafica', 'trigo', 'casa', 'maletin', 'moneda', 'candado', 'corona', 'birrete', 'espadas',
+  'bandera', 'llave', 'pico', 'fabrica', 'parlamento', 'luna', 'urna', 'corazon', 'rayo', 'arbol', 'montana', 'ola', 'flechaArriba', 'cruz',
+  'flor', 'llama', 'puente', 'libro', 'ojo', 'puno', 'tulipan', 'triangulo', 'anillos', 'atomo', 'cohete', 'rombo', 'paz', 'infinito',
+  'campana', 'gota', 'pluma', 'asterisco', 'brujula', 'cubo', 'tridente'];
+// El diseño de la insignia de un partido propio: su forma, cómo se reparten sus dos colores,
+// de qué color va el símbolo y, si se quiere, unas letras en lugar del símbolo.
+const FORMAS_INSIGNIA = { circulo: 'Círculo', cuadrado: 'Cuadrado', escudo: 'Escudo', hexagono: 'Hexágono' };
+const FONDOS_INSIGNIA = { liso: 'Liso', mitades: 'Dos mitades', diagonal: 'Diagonal', franja: 'Franja', aro: 'Aro' };
+const COLORES_SIMBOLO = ['#ffffff', '#f3d27a', '#1b221e'];
+const COLORES_SEGUNDO = ['#ffffff', '#1b221e', '#f3d27a', '#b3261e', '#2f5d9a', '#2c6e49'];
+const MAX_LETRAS_EMBLEMA = 3;
+const ES_COLOR = /^#[0-9a-f]{6}$/i;
+const limpiarLetras = t => [...String(t || '').replace(/[^\p{L}\p{N}+·!?-]/gu, '')].slice(0, MAX_LETRAS_EMBLEMA).join('');
+const disenoPartido = c => ({ color: c.color, emblema: c.emblema, insignia: c.insignia, fondo: c.fondo, color2: c.color2, colorSimbolo: c.colorSimbolo, letras: c.letras });
 
 // mant: mantenimiento mensual. meses: tiempo de obra. unico: solo uno por provincia.
 const EDIFICIOS = {

@@ -43,7 +43,7 @@ function miToken() {
 
 const codigoAlAzar = () => Array.from({ length: 5 }, () => LETRAS_CODIGO[Math.floor(Math.random() * LETRAS_CODIGO.length)]).join('');
 const perfilDe = c => ({
-  lider: c.lider, propio: c.propio, partidoId: c.partidoId, partido: c.partido, color: c.color, emblema: c.emblema,
+  lider: c.lider, propio: c.propio, partidoId: c.partidoId, partido: c.partido, ...disenoPartido(c),
   principios: [...c.principios], doctrina: c.doctrina, intervencion: c.intervencion, social: c.social, forma: c.forma, estado: c.estado,
   pais: c.pais, colorPais: c.colorPais, nacion: c.nacion || null,
 });

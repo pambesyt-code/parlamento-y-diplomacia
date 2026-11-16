@@ -55,7 +55,7 @@ function filaJugador(j, sala) {
   if (j.token === sala.owner) etiquetas.push(chip('anfitrión'));
   if (j.token === miToken()) etiquetas.push(chip('tú', 'pos'));
   if (!j.conectado) etiquetas.push(chip('desconectado', 'neg'));
-  return `<li>${logoPartido({ color: info.color, emblema: info.emblema })}
+  return `<li>${logoPartido(info)}
     <div><b>${esc(p.lider)}</b><small>${esc(info.partido)}${DOCTRINAS[info.doctrina] ? ` (${DOCTRINAS[info.doctrina].nombre.toLowerCase()})` : ''}, en ${esc(p.pais)} <i class="punto-color" style="background:${p.colorPais}"></i></small></div>
     <span class="chips">${etiquetas.join('')}</span></li>`;
 }

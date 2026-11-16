@@ -84,8 +84,9 @@ function colocarSemillas(rng, nContinente, islas) {
 // ---------- 2. Formas ----------
 // Cada celda de tierra pertenece a la provincia cuya capital está más cerca.
 
-function calcularGeometria(provs) {
-  const r = 13, ancho = Math.sqrt(3) * r, MARGEN = 5.5;
+// mascara(x, y): si se da, dice qué es tierra (un mapa dibujado a mano); si no, la tierra es lo que rodea a cada capital.
+function calcularGeometria(provs, mascara) {
+  const r = 13, ancho = Math.sqrt(3) * r, MARGEN = mascara ? 7 : 5.5;
   const minX = Math.min(...provs.map(p => p.x)) - MARGEN, minY = Math.min(...provs.map(p => p.y)) - MARGEN;
   for (const p of provs) { p.x -= minX; p.y -= minY; }
   const cols = Math.ceil(Math.max(...provs.map(p => p.x)) + MARGEN);
@@ -107,6 +108,7 @@ function calcularGeometria(provs) {
     cerca.push([]); tierra.push([]);
     for (let c = 0; c < cols; c++) {
       const [x, y] = centro(c, f);
+      if (mascara) { cerca[f].push(-1); tierra[f].push(!!mascara(x / ancho + minX, y / ancho + minY)); continue; }
       let mejor = 0, dmin = Infinity;
       semillas.forEach(([sx, sy], i) => {
         const d = Math.hypot(x - sx, y - sy) / ancho;
@@ -119,9 +121,55 @@ function calcularGeometria(provs) {
     }
   }
 
+  // Con un mapa dibujado, cada trozo de tierra se reparte entre las capitales que hay en él
+  // (así una costa de enfrente no se queda con la tuya); la tierra sin capital se hunde.
+  if (mascara) {
+    const masa = tierra.map(fila => fila.map(() => -1));
+    let n = 0;
+    for (let f = 0; f < filas; f++) for (let c = 0; c < cols; c++) {
+      if (!tierra[f][c] || masa[f][c] >= 0) continue;
+      const pila = [[c, f]];
+      masa[f][c] = n;
+      while (pila.length) {
+        const [pc, pf] = pila.pop();
+        for (const [dc, df] of vecinosDe(pf)) {
+          const nc = pc + dc, nf = pf + df;
+          if (dentro(nc, nf) && tierra[nf][nc] && masa[nf][nc] < 0) { masa[nf][nc] = n; pila.push([nc, nf]); }
+        }
+      }
+      n++;
+    }
+    const cercana = (x, y, vale) => {
+      let mejor = -1, dmin = Infinity;
+      semillas.forEach(([sx, sy], i) => {
+        if (!vale(i)) return;
+        const d = Math.hypot(x - sx, y - sy);
+        if (d < dmin) { dmin = d; mejor = i; }
+      });
+      return mejor;
+    };
+    // La masa de cada capital es la de la celda de tierra que le queda más cerca.
+    const masaDe = semillas.map(([sx, sy]) => {
+      let m = -1, dmin = Infinity;
+      for (let f = 0; f < filas; f++) for (let c = 0; c < cols; c++) {
+        if (!tierra[f][c]) continue;
+        const [x, y] = centro(c, f), d = Math.hypot(x - sx, y - sy);
+        if (d < dmin) { dmin = d; m = masa[f][c]; }
+      }
+      return m;
+    });
+    for (let f = 0; f < filas; f++) for (let c = 0; c < cols; c++) {
+      if (!tierra[f][c]) continue;
+      const [x, y] = centro(c, f), i = cercana(x, y, k => masaDe[k] === masa[f][c]);
+      if (i < 0) tierra[f][c] = false; else cerca[f][c] = i;
+    }
+  }
+
   // El mar es el agua conectada con el borde; el agua encerrada (lagos) se rellena de tierra.
-  const mar = tierra.map(fila => fila.map(() => false)), cola = [];
+  // En un mapa dibujado toda el agua es mar: sus mares interiores se quedan como están.
+  const mar = tierra.map(fila => fila.map(t => !!mascara && !t)), cola = [];
   for (let f = 0; f < filas; f++) for (let c = 0; c < cols; c++) {
+    if (mascara) break;
     if ((f === 0 || c === 0 || f === filas - 1 || c === cols - 1) && !tierra[f][c]) { mar[f][c] = true; cola.push([c, f]); }
   }
   while (cola.length) {
@@ -353,11 +401,16 @@ function crearPaises(rng, provs, geo, reparto) {
     porId[R.capital].capital = true;
   });
 
-  // Los que tocan a un jugador lo miran con algo más de recelo. Algunos vecinos son rivales entre sí.
+  ponerRivales(rng, provs, geo, reparto.jugadores.map(J => J.id));
+}
+
+// Los que tocan a un jugador lo miran con algo más de recelo. Algunos vecinos son rivales entre sí.
+function ponerRivales(rng, provs, geo, jugadores) {
+  const porId = Object.fromEntries(provs.map(p => [p.id, p]));
   const tocan = (a, b) => provs.some(p => p.pais === a && geo.vecinos[p.id].some(v => porId[v].pais === b));
   const ia = Object.keys(NACIONES).filter(pid => !NACIONES[pid].humano);
   for (const pid of barajar(rng, ia)) {
-    if (reparto.jugadores.some(J => tocan(pid, J.id))) NACIONES[pid].relacion -= 6;
+    if (jugadores.some(j => tocan(pid, j))) NACIONES[pid].relacion -= 6;
     if (NACIONES[pid].rival || rng() > 0.4) continue;
     const opciones = ia.filter(o => o !== pid && !NACIONES[o].rival && tocan(pid, o));
     if (!opciones.length) continue;
@@ -399,7 +452,8 @@ function darAtributos(rng, provs, geo, libre) {
       p.mineral = (t >= 0.45 && t < 0.75) || (t >= 0.75 && t < 0.87);
     }
     p.pob = p.capital ? azarEntre(1200, 1500) : azarEntre(350, 850);
-    if (propia) {
+    if (p.nombre) usados.add(p.nombre);   // un mapa dibujado ya trae sus nombres
+    else if (propia) {
       const costera = geo.provs[p.id].costera && !p.capital;
       const lista = costera && propios.costa.length ? propios.costa : propios.interior.length ? propios.interior : propios.costa;
       p.nombre = lista.shift() || nombreConEstilo(rng, 'latino', usados);
@@ -441,11 +495,13 @@ function darAtributos(rng, provs, geo, libre) {
 // humanos: cuántas naciones llevan jugadores. Con varios, cada uno tiene 2 provincias menos y hay
 // menos países de la IA, para que todo quepa. Si una semilla da un mapa cojo, prueba la siguiente.
 // humanos = 0 es el mundo libre del multijugador: ningún país reservado, todos se pueden elegir.
-function generarMundo(semilla, tamano, humanos = 1) {
+// elegido: en el mapa secreto de Europa, el país que lleva el jugador.
+function generarMundo(semilla, tamano, humanos = 1, elegido) {
   const T = TAMANOS[tamano] || TAMANOS.mediano;
   const libre = humanos === 0;
   const propias = humanos > 1 ? T.propias - 2 : T.propias;
-  let mundo = null;
+  const europa = humanos === 1 && typeof esEuropa === 'function' && esEuropa(semilla);
+  let mundo = europa ? mundoEuropa(elegido) : null;
   for (let intento = 0; intento < 24 && !mundo; intento++) {
     const estricto = intento < 20;
     const rng = crearAzar((semilla >>> 0) + intento * 7919);
@@ -463,8 +519,9 @@ function generarMundo(semilla, tamano, humanos = 1) {
     if (estricto && reparto.paises.length < Math.ceil(nPaises * 2 / 3)) continue;
     mundo = { rng, provs, geo, reparto, libre };
   }
-  crearPaises(mundo.rng, mundo.provs, mundo.geo, mundo.reparto);
+  if (!europa) crearPaises(mundo.rng, mundo.provs, mundo.geo, mundo.reparto);
   darAtributos(mundo.rng, mundo.provs, mundo.geo, mundo.libre);
+  if (europa) compensarPaisPequeno(mundo.provs);
   PROVINCIAS = mundo.provs;
   PROV_POR_ID = Object.fromEntries(PROVINCIAS.map(p => [p.id, p]));
   GEO = mundo.geo;

@@ -3,6 +3,26 @@
 // Al publicar una versión: añadir su entrada arriba, aquí y en CHANGELOG.md.
 
 const TEXTO_NOVEDADES = `
+## 🎨 Versión 2.2 — *«Tu partido, tu sello»* (16/11/2026)
+
+### ✨ Novedades
+
+- 🛡️ **Diseña la insignia de tu partido**: ya no es solo un círculo con un dibujo.
+  - 🔷 **4 formas**: círculo, cuadrado, escudo y hexágono.
+  - 🌗 **5 fondos con dos colores**: liso, dos mitades, diagonal, franja y aro. Eliges los dos colores que quieras.
+  - 🖌️ **Color del símbolo** a tu gusto: blanco, dorado, negro o cualquier otro.
+- ⭐ **61 símbolos** para elegir (antes había 5): corazón, rayo, puño, cohete, átomo, árbol, llama, libro, ojo, tridente, signo de la paz y muchos más.
+- 🔤 **Letras en la insignia**: escribe hasta **3 letras o números** (las siglas de tu partido, por ejemplo) y sustituyen al símbolo.
+- 👀 Tu insignia se ve **en todo el juego**: hemiciclo, encuestas, pactos, mapa electoral y sala de multijugador.
+- 🤫 **Hay un mapa secreto.** Dicen que, si en el número del mapa escribes el nombre de cierto **continente**, el mundo deja de ser inventado…
+
+### 🔧 Cambios
+
+- 🗺️ La casilla del número del mapa ahora también admite letras.
+- 🌐 Todo lo nuevo está **traducido** a inglés, alemán, francés y portugués.
+
+---
+
 ## 🗳️ Versión 2.1 — *«Pactos y Coronas»* (16/11/2026)
 
 ### ✨ Novedades

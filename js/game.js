@@ -16,7 +16,7 @@ const provinciasJugador = () => provinciasDe(PAIS_JUGADOR.id);
 const provinciasLibres = s => provinciasJugador().filter(p => !s.ocupadas[p.id]);
 const poblacionTotal = s => provinciasLibres(s).reduce((a, p) => a + p.pob, 0);
 const paisesVivos = s => Object.keys(s.paises).filter(pid => !s.mundo.eliminados[pid]);
-const solaresDe = p => (p.capital ? 5 : 4);
+const solaresDe = p => p.solares || (p.capital ? 5 : 4);
 const dificultad = s => DIFICULTADES[s.config.dificultad];
 
 // Naciones con jugador de esta partida, por país. En solitario solo está la tuya;
@@ -33,12 +33,22 @@ const CONFIG_BASE = {
   // estado: la forma del Estado del país ('monarquia' o 'republica'). Lo que defiende el partido
   // sobre eso (forma) y sobre las costumbres (social) sale de su doctrina si no se elige.
   pais: 'Aldora', colorPais: COLORES_PAIS[0], tamano: 'mediano', semilla: 1, nPartidos: 6, estado: 'monarquia',
+  // El diseño de la insignia de un partido propio (ver disenoPartido en data.js).
+  insignia: 'circulo', fondo: 'liso', color2: '#ffffff', colorSimbolo: '#ffffff', letras: '',
+  // paisEuropa: el país que llevas si el mapa es el secreto de Europa (semilla 'EUROPA').
+  paisEuropa: 'es',
 };
 
 // Completa una configuración. Si te unes a un partido que ya existe, llevas su nombre, color y emblema.
 function completarConfig(config) {
   const cfg = { ...CONFIG_BASE, ...config, principios: [...((config && config.principios) || [])] };
   if (!/^#[0-9a-f]{6}$/i.test(cfg.color)) cfg.color = COLORES_PARTIDO[0];
+  if (!FORMAS_INSIGNIA[cfg.insignia]) cfg.insignia = 'circulo';
+  if (!FONDOS_INSIGNIA[cfg.fondo]) cfg.fondo = 'liso';
+  if (!ES_COLOR.test(cfg.color2)) cfg.color2 = '#ffffff';
+  if (!ES_COLOR.test(cfg.colorSimbolo)) cfg.colorSimbolo = '#ffffff';
+  cfg.letras = limpiarLetras(cfg.letras);
+  if (typeof esEuropa === 'function' && esEuropa(cfg.semilla)) cfg.semilla = 'EUROPA';
   if (!FORMAS_ESTADO[cfg.estado]) cfg.estado = 'monarquia';
   // Un partido provincial lo fundas tú: no puede ser uno de los de siempre.
   if (cfg.modo === 'provincial') cfg.propio = true;
@@ -52,7 +62,8 @@ function completarConfig(config) {
   } else {
     if (!CATALOGO_PARTIDOS[cfg.partidoId]) cfg.partidoId = 'fo';
     const P = CATALOGO_PARTIDOS[cfg.partidoId];
-    Object.assign(cfg, { partido: P.nombre, color: P.color, emblema: P.emblema, principios: [], doctrina: P.doctrina, intervencion: P.intervencion,
+    Object.assign(cfg, { partido: P.nombre, color: P.color, emblema: P.emblema, insignia: 'circulo', fondo: 'liso', colorSimbolo: '#ffffff', letras: '',
+      principios: [], doctrina: P.doctrina, intervencion: P.intervencion,
       social: nivelSocial(P), forma: posturaForma(P) });
   }
   return cfg;
@@ -239,14 +250,14 @@ function usarNacion(s) {
 // Nombre, color y bandera con los que los demás ven el país de un jugador.
 function registrarHumano(pid, cfg) {
   Object.assign(NACIONES[pid], {
-    humano: true, nombre: cfg.pais, color: cfg.colorPais, bandera: banderaJugador(cfg.colorPais), lider: cfg.lider,
+    humano: true, nombre: cfg.pais, color: cfg.colorPais, bandera: NACIONES[pid].banderaFija || banderaJugador(cfg.colorPais), lider: cfg.lider,
     gobierno: `Gobierno de ${cfg.lider}`, desc: `Lo dirige ${cfg.lider}, de ${cfg.partido}.`,
   });
 }
 
 // Genera el mundo de una partida con sus naciones de jugador. duenos: provincias que han cambiado de manos.
 function prepararMundo(cfg, humanos = 1, duenos = {}) {
-  generarMundo(cfg.semilla, cfg.tamano, humanos);
+  generarMundo(cfg.semilla, cfg.tamano, humanos, cfg.paisEuropa);
   for (const id in duenos) if (PROV_POR_ID[id]) PROV_POR_ID[id].pais = duenos[id];
   recalcularFronteras();
 }
@@ -475,11 +486,11 @@ function partidoInfo(s, pid) {
   const o = opositorDe(s, pid);
   if (o) {
     const c = o.perfil;
-    return c.propio ? { ...P, humano: true, lider, nombre: c.partido, siglas: siglasDe(c.partido), color: c.color, emblema: c.emblema, afinidad: afinidadDe(s, pid) }
+    return c.propio ? { ...P, humano: true, lider, nombre: c.partido, siglas: siglasDe(c.partido), ...disenoPartido(c), afinidad: afinidadDe(s, pid) }
       : { ...P, humano: true, lider };
   }
   if (!s || !jugador || !s.config.propio) return { ...P, jugador, lider };
-  return { ...P, jugador, lider, nombre: s.config.partido, siglas: siglasDe(s.config.partido), color: s.config.color, emblema: s.config.emblema, afinidad: afinidadDe(s, pid) };
+  return { ...P, jugador, lider, nombre: s.config.partido, siglas: siglasDe(s.config.partido), ...disenoPartido(s.config), afinidad: afinidadDe(s, pid) };
 }
 
 const mediaBase = base => Object.keys(GRUPOS).reduce((a, g) => a + GRUPOS[g].peso * base[g], 0);

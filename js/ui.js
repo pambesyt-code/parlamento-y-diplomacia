@@ -1158,6 +1158,13 @@ const acciones = {
     if (i >= 0) p.splice(i, 1); else if (p.length < MAX_PRINCIPIOS) p.push(d.v);
   },
   otroMapa: () => { ui.cfg.semilla = semillaAlAzar(); },
+  // Elegir un símbolo quita las letras, que lo tapaban.
+  cfgEmblema: d => { ui.cfg.emblema = d.v; ui.cfg.letras = ''; if (ui.pantalla === 'sala') enviarPerfil(); },
+  cfgEuropa: d => {
+    if (!EUROPA.paises[d.v]) return;
+    ui.cfg.paisEuropa = d.v;
+    ui.cfg.pais = EUROPA.paises[d.v].nombre;
+  },
   empezar: () => {
     const c = ui.cfg;
     c.lider = c.lider.trim() || CONFIG_BASE.lider;
@@ -1344,6 +1351,14 @@ document.addEventListener('click', ev => {
   render();
 });
 
+// Los selectores de color libre de la insignia y el campo de la configuración que cambia cada uno.
+const COLORES_VIVOS = { 'cfg-color': 'color', 'cfg-color2': 'color2', 'cfg-color3': 'colorSimbolo' };
+// Mientras se escribe o se arrastra en la paleta solo se cambia la insignia de la vista previa.
+function refrescarInsignia() {
+  const logo = $('.vista-partido .logo');
+  if (logo) logo.outerHTML = logoPartido(ui.cfg, 'grande');
+}
+
 document.addEventListener('input', ev => {
   const t = ev.target;
   // Mientras se escribe solo se retoca la vista previa: redibujar el formulario quitaría el foco.
@@ -1354,18 +1369,32 @@ document.addEventListener('input', ev => {
     const rotulo = $('.vista-mundo .propio');
     if (rotulo) rotulo.textContent = (t.value.trim() || 'Tu país').toUpperCase();
   } else if (t.id === 'cfg-semilla') {
-    const n = parseInt(t.value.replace(/\D/g, ''), 10);
-    if (n) { ui.cfg.semilla = n; ponerHTML($('#menu-hero'), vistaMundo()); }
-  } else if (t.id === 'cfg-color') {
-    ui.cfg.color = t.value;
-    const logo = $('.vista-partido .logo-partido, .vista-partido svg');
-    if (logo) logo.style.setProperty('--c', t.value);
+    // La palabra EUROPA abre el mapa secreto; cualquier otra cosa es un número de mapa.
+    if (esEuropa(t.value)) {
+      if (ui.cfg.semilla !== 'EUROPA') {
+        ui.cfg.semilla = 'EUROPA';
+        if (!EUROPA.paises[ui.cfg.paisEuropa]) ui.cfg.paisEuropa = EUROPA_POR_DEFECTO;
+        ui.cfg.pais = EUROPA.paises[ui.cfg.paisEuropa].nombre;
+        Sonido.tocar('moneda');
+        render();
+      }
+      return;
+    }
+    const n = parseInt(t.value.replace(/\D/g, ''), 10), era = esEuropa(ui.cfg.semilla);
+    if (n) { ui.cfg.semilla = n; if (era) render(); else ponerHTML($('#menu-hero'), vistaMundo()); }
+  } else if (COLORES_VIVOS[t.id]) {
+    ui.cfg[COLORES_VIVOS[t.id]] = t.value;
+    refrescarInsignia();
+  } else if (t.id === 'cfg-letras') {
+    ui.cfg.letras = limpiarLetras(t.value);
+    refrescarInsignia();
   } else if (t.id === 'codigo-sala') ui.codigoSala = t.value.toUpperCase();
   else if (t.id === 'op-volumen') { opciones.volumen = t.value / 100; aplicarOpciones(); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'op-volumen') Sonido.tocar('moneda');
-  if (ev.target.id === 'cfg-color') { ui.cfg.color = ev.target.value; if (ui.pantalla === 'sala') enviarPerfil(); render(); }
+  if (COLORES_VIVOS[ev.target.id]) { ui.cfg[COLORES_VIVOS[ev.target.id]] = ev.target.value; if (ui.pantalla === 'sala') enviarPerfil(); render(); }
+  if (ev.target.id === 'cfg-letras') { ui.cfg.letras = limpiarLetras(ev.target.value); if (ui.pantalla === 'sala') enviarPerfil(); render(); }
   // En la sala, el nombre del jugador, del partido y del país se mandan al terminar de escribirlos.
   if (ui.pantalla === 'sala' && /^cfg-(lider|partido|pais)$/.test(ev.target.id)) { enviarPerfil(); render(); }
 });
