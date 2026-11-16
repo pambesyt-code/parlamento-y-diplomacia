@@ -948,7 +948,7 @@ body.con-tutorial main { padding-bottom: calc(var(--alto-tut, 200px) + 32px); }
 .tv-nota { margin: 6px 0 0 !important; font-size: 12px !important; text-align: center; font-variant-numeric: tabular-nums; color: var(--sobre-sala-2) !important; }
 .tv-puntos { display: flex; justify-content: center; gap: 5px; }
 .tv-puntos i { width: 17px; height: 17px; border-radius: 50%; border: 2px solid rgba(243, 210, 122, .45); }
-.tv-puntos i.lleno { background: var(--laton-2); border-color: var(--laton-2); box-shadow: 0 0 8px rgba(243, 210, 122, .45); }
+.tv-puntos i.lleno { background: var(--laton-2); border-color: var(--laton-2); }
 .tv-costes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .tv-costes span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 99px; background: rgba(240, 233, 212, .08); font-size: 12px; }
 .tv-costes b { display: inline-flex; align-items: center; gap: 2px; color: var(--laton-2); font-variant-numeric: tabular-nums; }
