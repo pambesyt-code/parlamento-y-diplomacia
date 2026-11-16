@@ -1,0 +1,7 @@
+# Carpetas de herramientas y de trabajo: no son parte del juego
+.omc/
+.claude/
+.impeccable/
+graphify-out/
+docs/
+server.js

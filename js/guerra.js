@@ -340,6 +340,7 @@ function iniciarMundo(m) {
       m.rel[claveRel(ids[i], ids[j])] = NACIONES[ids[i]].rival === ids[j] ? -55 : Math.round(-25 + Math.random() * 45);
     }
   }
+  iniciarPolitica(m);
 }
 
 // Cada mes: las guerras entre países de la IA avanzan, surgen roces o pactos, cambian gobiernos
@@ -418,14 +419,8 @@ function simularMundo(naciones) {
     }
   }
 
-  const tranquilos = paisesIA(m).filter(pid => !contraJugador(pid));
-  if (tranquilos.length && Math.random() < 0.035) {
-    const pid = alAzar(tranquilos), d = Math.random() < 0.5 ? 15 : -15;
-    for (const s of naciones) {
-      s.paises[pid].base = limitar(s.paises[pid].base + d, -40, 40);
-      noticia(s, `Cambio de gobierno en ${nombre(pid)}: el nuevo gabinete mira a ${s.config.pais} con ${d > 0 ? 'simpatía' : 'recelo'}.`, 'mundo');
-    }
-  }
+  // Elecciones, golpes y caídas de dictaduras en los demás países (ver js/regimenes.js).
+  mesPolitica(naciones, aTodos);
 
   // Un vecino más fuerte que un jugador y que no lo aprecia acaba reclamando tierras; si la cosa
   // empeora, llega el ultimátum.
@@ -437,7 +432,8 @@ function simularMundo(naciones) {
       const frontera = provinciasLibres(s).filter(q => GEO.vecinos[q.id].some(v => PROV_POR_ID[v].pais === pid)
         || (PAISES[pid].isla && GEO.provs[q.id].costera));
       if (!frontera.length || p.tregua > s.mes || p.alianza || p.ejercito <= fuerzaDefensa(s)) continue;
-      if (p.relacion <= -45 && !s.evento && Math.random() < 0.25) {
+      // Las dictaduras aguantan menos antes de amenazar.
+      if (p.relacion <= (esDictadura(s, pid) ? -30 : -45) && !s.evento && Math.random() < 0.25) {
         s.evento = { id: 'ultimatum', pais: pid };
         break;
       }

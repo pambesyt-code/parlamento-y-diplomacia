@@ -12,8 +12,9 @@ const COLOR_RIVAL = '#8b948c';
 const colorJugador = () => partidoInfo(estado, ID_JUGADOR).color;
 
 function pasosCarrera() {
-  const lider = esLider(estado);
-  const pasos = [['Diputado', true, !lider], ['Líder del partido', lider, lider], ['Jefe de gobierno', false, false]];
+  const lider = esLider(estado), dentro = estado.escanos[ID_JUGADOR] > 0;
+  const pasos = esProvincial(estado) ? [['Partido sin escaños', true, !dentro], ['En el Parlamento', dentro, dentro], ['Jefe de gobierno', false, false]]
+    : [['Diputado', true, !lider], ['Líder del partido', lider, lider], ['Jefe de gobierno', false, false]];
   return `<ol class="pasos">${pasos.map(([nombre, hecho, actual]) =>
     `<li class="${hecho ? 'hecho' : ''} ${actual ? 'actual' : ''}"><i>${hecho && !actual ? ico('check') : ''}</i><span>${nombre}</span></li>`).join('')}</ol>`;
 }
@@ -31,16 +32,19 @@ function tarjetaCita() {
   const enc = estimarVotos(s, false), rival = Object.keys(enc).filter(p => p !== ID_JUGADOR).reduce((a, b) => (enc[b] > enc[a] ? b : a));
   return `<div class="tarjeta resaltada">
     <div class="tarjeta-cab"><b>Elecciones generales</b><span class="cuenta">en ${plural(faltanElecciones(s), 'mes', 'meses')}</span></div>
-    <p>Gobierna el partido que saque más escaños. Esto dicen hoy las encuestas:</p>
-    ${duelo([[nombrePartido(ID_JUGADOR), enc[ID_JUGADOR], colorJugador()], [nombrePartido(rival), enc[rival], partidoInfo(s, rival).color]], 50)}
-    <p class="nota">${ganaJugador(enc) ? 'Vas en cabeza. Aguanta hasta el día de la votación.' : 'Promesas, mítines y campaña te acercan a los votantes.'}</p></div>`;
+    <p>${usaPactos(s) ? `Gobierna quien reúna ${MAYORIA} de los ${ESCANOS} escaños, solo o con socios de ideas cercanas.` : 'Gobierna el partido que saque más escaños.'} Esto dicen hoy las encuestas:</p>
+    ${duelo([[nombrePartido(ID_JUGADOR), enc[ID_JUGADOR], colorJugador()], [nombrePartido(rival), enc[rival], partidoInfo(s, rival).color]], MAYORIA)}
+    <p class="nota">${ganaJugador(enc) ? 'Vas en cabeza. Aguanta hasta el día de la votación.'
+      : esProvincial(s) ? 'Más sedes, más prestigio y campañas: así se ganan los escaños.' : 'Promesas, mítines y campaña te acercan a los votantes.'}</p></div>`;
 }
 
 function tabCarrera() {
-  const s = estado, lider = esLider(s);
+  const s = estado, lider = esLider(s), socios = (s.sociosIA || []).filter(pid => PARTIDOS[pid]);
+  const cargo = esProvincial(s) ? (s.escanos[ID_JUGADOR] > 0 ? `Fundador de ${nombrePartido(ID_JUGADOR)}, en la oposición` : `Fundador de ${nombrePartido(ID_JUGADOR)}, todavía sin escaños`)
+    : lider ? `Líder de ${nombrePartido(ID_JUGADOR)} y jefe de la oposición` : `Diputado de ${nombrePartido(ID_JUGADOR)}, en la oposición`;
   return `<h2>${esc(s.config.lider)}</h2>
-    <p class="nota">${lider ? `Líder de ${nombrePartido(ID_JUGADOR)} y jefe de la oposición` : `Diputado de ${nombrePartido(ID_JUGADOR)}, en la oposición`}.
-      Gobierna ${nombrePartido(s.gobiernoIA)}.</p>
+    <p class="nota">${cargo}.
+      Gobierna ${nombrePartido(s.gobiernoIA)}${socios.length ? `, con el apoyo de ${socios.map(nombrePartido).join(', ')}` : ''}.</p>
     ${pasosCarrera()}${tarjetaDirectiva()}${tarjetaCita()}
     <h3>Qué haces este mes</h3>
     <p class="nota">Cada cosa, una vez al mes. También puedes presentar leyes en Parlamento y dar mítines en Votantes.</p>
@@ -50,7 +54,7 @@ function tabCarrera() {
       <div class="edif-acc">${boton(`Hacerlo <span class="coste">${ico('estrella')}${a.cp}${a.fondos ? ` ${ico('moneda')}${a.fondos}` : ''}</span>`,
         { a: 'accionCarrera', v: a.id }, puedeAccionCarrera(s, a.id), 'mini')}</div>
     </div>`).join('')}
-    <h3>Tu partido en las encuestas</h3>${grafica(s.historial.map(h => h.v), ' escaños', [10, 50])}
+    <h3>Tu partido en las encuestas</h3>${grafica(s.historial.map(h => h.v), ' escaños', [0, MAYORIA])}
     ${htmlAnuncios()}
     ${htmlCorrupcion()}`;
 }
@@ -80,10 +84,10 @@ function tabPartido() {
   const prometidas = c.promesas.map(id => LEY_POR_ID[id]);
   const candidatas = LEYES.filter(l => !s.leyes[l.id] && !c.promesas.includes(l.id));
   return `${cab}
-    <div class="tarjeta"><div class="tarjeta-cab"><b>Unidad del partido</b><span class="cuenta ${c.interno < 35 ? 'neg' : ''}">${c.interno}</span></div>
+    ${esProvincial(s) ? htmlSedes() : `<div class="tarjeta"><div class="tarjeta-cab"><b>Unidad del partido</b><span class="cuenta ${c.interno < 35 ? 'neg' : ''}">${c.interno}</span></div>
       ${barraApoyo(c.interno, 25)}
-      <p class="nota">Sube cuando las encuestas te dan más de 3 escaños sobre los que tienes y baja cuando te dan menos.
-        Si cae por debajo de la marca, el partido te destituye.</p></div>
+      <p class="nota">Sube cuando las encuestas te dan más de 10 escaños sobre los que tienes y baja cuando te dan menos.
+        Si cae por debajo de la marca, el partido te destituye.</p></div>`}
     <h3>Programa electoral <span class="cuenta">${prometidas.length} de ${MAX_PROMESAS} promesas</span></h3>
     <p class="nota">Cada promesa atrae ya a los grupos a los que beneficia y aleja a los que perjudica. Si ganas, tendrás 12 meses para aprobarla.</p>
     ${prometidas.map(l => `<div class="tarjeta vigente"><div class="tarjeta-cab"><b>${l.nombre}</b><span class="cuenta">prometida</span></div>
@@ -108,7 +112,10 @@ function tabMapaElectoral() {
       <div class="duelo">${orden.map(pid => fila(nombrePartido(pid), votos[pid], partidoInfo(s, pid).color)).join('')}</div>
       <h3>Quién vive aquí</h3>
       <div class="duelo">${Object.keys(GRUPOS).map((g, i) => fila(GRUPOS[g].nombre, p.mix[i], 'var(--laton)')).join('')}</div>
-      <p class="nota">Para ganar una provincia, convence a los grupos que más pesan en ella.</p>`;
+      <p class="nota">Para ganar una provincia, convence a los grupos que más pesan en ella.</p>
+      ${esProvincial(s) ? `<h3>Tu sede aquí <span class="cuenta">${NOMBRES_SEDE[s.carrera.sedes[p.id] || 0]}</span></h3>
+        ${(s.carrera.sedes[p.id] || 0) >= 3 ? '<p class="nota">Ya llegas a todos los votantes de la provincia.</p>'
+          : boton(`${s.carrera.sedes[p.id] ? 'Ampliar la sede' : 'Abrir una delegación'} <span class="coste">${ico('estrella')}${costeSede(s, p.id).cp} ${ico('moneda')}${costeSede(s, p.id).fondos}</span>`, { a: 'sede', prov: p.id }, puedeSede(s, p.id), 'mini')}` : ''}`;
   }
   const provs = provinciasJugador().map(p => ({ p, votos: votoProvincia(s, p.id) }));
   const ganadas = provs.filter(x => masVotado(x.votos) === ID_JUGADOR).length;
@@ -116,6 +123,7 @@ function tabMapaElectoral() {
     <p class="nota">Quién ganaría hoy en cada provincia, según los grupos que viven en ella. Tu partido iría primero en ${ganadas} de ${provs.length}.</p>
     <div class="lista-prov">${provs.map(({ p, votos }) => `<button class="fila-prov" data-a="prov" data-prov="${p.id}">
       ${logoPartido(partidoInfo(s, masVotado(votos)), 'mini')}<b>${p.capital ? '★ ' : ''}${p.nombre}</b>
+      ${esProvincial(s) ? chip(NOMBRES_SEDE[s.carrera.sedes[p.id] || 0], s.carrera.sedes[p.id] ? 'pos' : '') : ''}
       <span class="cuenta" style="margin-left:auto">tu partido: ${Math.round(votos[ID_JUGADOR] * 100)}%</span></button>`).join('')}</div>`;
 }
 

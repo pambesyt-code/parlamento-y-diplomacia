@@ -57,7 +57,7 @@ const G = {
   },
   proponer: {
     titulo: () => 'Propón una ley',
-    texto: () => 'El hemiciclo muestra los 100 escaños. Más abajo están las leyes: cada una dice a quién gusta y qué cuesta. Pulsa <b>Proponer</b> en la que quieras.',
+    texto: () => 'El hemiciclo muestra los 350 escaños. Más abajo están las leyes: cada una dice a quién gusta y qué cuesta. Pulsa <b>Proponer</b> en la que quieras.',
     foco: enTab('parlamento', '.tarjeta [data-a="proponer"]:not(:disabled)'),
     alEntrar: (s, t) => { t.propBase = s.cuenta.propuestas; },
     hecho: (s, t) => !!s.propuesta || s.cuenta.propuestas > t.propBase,
@@ -82,7 +82,7 @@ const G = {
     hecho: () => ui.tab === 'sociedad',
   },
   sociedad: {
-    titulo: () => 'Cuatro grupos, cien escaños',
+    titulo: () => 'Cuatro grupos, 350 escaños',
     texto: () => 'Obreros, empresarios, campesinos y jóvenes: su apoyo decide cuántos escaños sacas en las elecciones. Aquí ves qué le gusta y qué le molesta a cada uno, y puedes dar un mitin para ganártelos.',
     foco: '#contenido',
   },
@@ -325,6 +325,8 @@ function iniciarTutorial() {
   estado = nuevaPartida({
     ...c, principios: [...c.principios], lider: c.lider.trim() || CONFIG_BASE.lider, partido: c.partido.trim() || CONFIG_BASE.partido,
     pais: c.pais.trim() || CONFIG_BASE.pais, modo: 'gobierno', dificultad: 'facil', tamano: 'pequeno', nPartidos: 4, legislatura: 24, semilla: 7,
+    // En el tutorial gobierna el más votado, sin pactos: una cosa menos que aprender de golpe.
+    sinPactos: true,
   });
   entrarJuego();
   ui.tutorial = { tipo: 'simple', paso: 0, nuevo: true, foco: '' };
@@ -340,7 +342,7 @@ function iniciarTutorialCompleto() {
 }
 
 // La partida del tutorial completo: carrera en fácil, con el congreso a la vuelta de la esquina.
-function configTutorialCompleto(c) { return { ...c, modo: 'carrera', dificultad: 'facil' }; }
+function configTutorialCompleto(c) { return { ...c, modo: 'carrera', dificultad: 'facil', sinPactos: true }; }
 function prepararPartidaTutorial(s) {
   const c = s.carrera;
   Object.assign(c, { congresoMes: 4, interno: 40, apoyoLider: 46, fondos: 90 });

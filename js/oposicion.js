@@ -130,7 +130,7 @@ function mesOposicion(s) {
 
 const perfilDeConfig = c => ({
   lider: c.lider, propio: c.propio, partidoId: c.partidoId, partido: c.partido, color: c.color, emblema: c.emblema,
-  principios: [...(c.principios || [])], doctrina: c.doctrina, intervencion: c.intervencion,
+  principios: [...(c.principios || [])], doctrina: c.doctrina, intervencion: c.intervencion, social: c.social, forma: c.forma,
   pais: c.pais, colorPais: c.colorPais, nacion: c.nacion, hueco: huecoDe(c),
 });
 
@@ -138,7 +138,7 @@ const perfilDeConfig = c => ({
 // gobernaba pasa a la oposición. El país conserva su nombre, su color y sus leyes.
 function cambiarGobierno(s, o) {
   const antes = { token: s.tokenGobierno, perfil: perfilDeConfig(s.config), cp: s.cp };
-  const c = s.config, fijos = { modo: 'gobierno', dificultad: c.dificultad, legislatura: c.legislatura, tamano: c.tamano, semilla: c.semilla, pais: c.pais, colorPais: c.colorPais };
+  const c = s.config, fijos = { modo: 'gobierno', dificultad: c.dificultad, legislatura: c.legislatura, tamano: c.tamano, semilla: c.semilla, pais: c.pais, colorPais: c.colorPais, estado: c.estado };
   s.config = completarConfig({ ...o.perfil, ...fijos, hueco: o.partido, nPartidos: c.nPartidos });
   s.tokenGobierno = o.token;
   s.cp = o.cp;

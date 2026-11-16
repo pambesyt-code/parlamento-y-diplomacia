@@ -1,10 +1,13 @@
 'use strict';
 // Datos del juego: todo lo que se puede equilibrar o ampliar sin tocar las reglas.
 
-const VERSION = '2.0';
+const VERSION = '2.1';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const ANIO_INICIAL = 2030;
 const CP_MAXIMO = 10;
+// El parlamento: cuántos escaños tiene y cuántos hacen falta para la mayoría absoluta.
+const ESCANOS = 350;
+const MAYORIA = Math.floor(ESCANOS / 2) + 1;
 
 // Contexto de la partida activa. Lo fija prepararMundo() al empezar o cargar una partida:
 // qué partido llevas, cuánto dura la legislatura, cómo se llama tu país y qué provincias hay.
@@ -27,6 +30,7 @@ const DIFICULTADES = {
 const MODOS_JUEGO = {
   carrera: { nombre: 'Carrera política', desc: 'Empiezas como diputado. Gana el partido, luego las elecciones y después gobierna.' },
   gobierno: { nombre: 'Gobierno directo', desc: 'Empiezas ya como jefe de gobierno, con las elecciones ganadas.' },
+  provincial: { nombre: 'Partido provincial', desc: 'Fundas un partido en una sola provincia, sin un escaño. Abre sedes, crece y llega al gobierno.' },
 };
 
 const LEGISLATURAS = { 18: 'Corta: 18 meses', 24: 'Normal: 24 meses', 36: 'Larga: 36 meses' };
@@ -71,6 +75,21 @@ const CARACTERES = [
   { gobierno: 'República', desc: 'Democracia joven y abierta al mundo.', fuerza: 1.2, comercio: 32, relacion: 12 },
   { gobierno: 'Imperio', desc: 'Sueña con recuperar su antigua grandeza.', fuerza: 2.1, comercio: 28, relacion: -20 },
 ];
+// Cómo empieza cada tipo de país: si vota o no y qué forma de Estado tiene (ver js/regimenes.js).
+const REGIMEN_INICIAL = {
+  'Monarquía': { regimen: 'democracia', forma: 'monarquia' },
+  'República militar': { regimen: 'dictadura', forma: 'republica' },
+  'Federación': { regimen: 'democracia', forma: 'republica' },
+  'República mercantil': { regimen: 'democracia', forma: 'republica' },
+  'Principado': { regimen: 'democracia', forma: 'monarquia' },
+  'Teocracia': { regimen: 'dictadura', forma: 'republica' },
+  'República': { regimen: 'democracia', forma: 'republica' },
+  'Imperio': { regimen: 'dictadura', forma: 'monarquia' },
+};
+// Las doctrinas que gobiernan en los demás países: las que ganan elecciones y las que mandan en una dictadura.
+const DOCTRINAS_URNAS = ['socialdemocracia', 'liberalismo', 'conservadurismo', 'democristiana', 'socialismo', 'centrismo', 'progresismo', 'agrarismo',
+  'ecologismo', 'laborismo', 'liberal_conservadurismo', 'socioliberalismo', 'nacionalpopulismo', 'populismo_izq', 'justicialismo'];
+const DOCTRINAS_DICTADURA = ['leninismo', 'maoismo', 'fascismo', 'nacionalismo', 'tradicionalismo', 'integrismo', 'falangismo'];
 const COLORES_MAPA = ['#7f9fc4', '#a88bbb', '#8cba97', '#b3a08c', '#dd9376', '#7fb3b0', '#c98fa8', '#9aa86b', '#b08463', '#8e9ec9', '#a3c08a',
   '#9c8fc4', '#c77d6b', '#6fa6a0', '#bf9c6f', '#a8a8a0', '#86a6d1', '#cf8f8f', '#94b8a0', '#b7a3c9', '#d4a088', '#8fa38a'];
 const COLORES_BANDERA = ['#f1ece0', '#2a2622', '#b3261e', '#2f5d9a', '#e2b458', '#2c6e49', '#5b3a78', '#d9744f'];
@@ -294,6 +313,117 @@ const DOCTRINAS = {
     rasgo: { texto: 'Movilización total: caben 2 regimientos más y reclutar cuesta un 15% menos.', mods: { capacidad: 2, reclutar: 0.85 } },
   },
 };
+// Más doctrinas (versión 2.1).
+Object.assign(DOCTRINAS, {
+  eurocomunismo: {
+    nombre: 'Eurocomunismo', familia: 'izquierda', eje: -1.7, intervencion: 3,
+    desc: 'Comunismo que acepta las urnas, el pluralismo y las libertades.',
+    afinidad: { izquierda: 2, social: 1, libertad: 1, derecha: -2 },
+    grupos: { obreros: 0.3, jovenes: 0.1, empresarios: -0.4 },
+    rasgo: { texto: 'Lucha obrera: los obreros te apoyan 2 puntos más y la estabilidad sube 1.', grupos: { obreros: 2 }, estabilidad: 1 },
+  },
+  laborismo: {
+    nombre: 'Laborismo', familia: 'izquierda', eje: -1.1, intervencion: 3,
+    desc: 'El partido de los sindicatos: empleo, salarios y servicios públicos.',
+    afinidad: { izquierda: 2, social: 1, derecha: -1 },
+    grupos: { obreros: 0.35, empresarios: -0.25 },
+    rasgo: { texto: 'Mesa con los sindicatos: las fábricas rinden un 5% más y los obreros te apoyan 2 más.', mods: { fabricas: 1.05 }, grupos: { obreros: 2 } },
+  },
+  populismo_izq: {
+    nombre: 'Populismo de izquierdas', familia: 'izquierda', eje: -1.4, intervencion: 3,
+    desc: 'El pueblo contra las élites: subsidios, nacionalizaciones y plazas llenas.',
+    afinidad: { izquierda: 2, nacional: 1, social: 1, derecha: -2, global: -1 },
+    grupos: { obreros: 0.25, campesinos: 0.15, jovenes: 0.1, empresarios: -0.45 },
+    rasgo: { texto: 'Plazas llenas: cada mitin da 2 puntos más de apoyo.', mitin: 2 },
+  },
+  pirata: {
+    nombre: 'Movimiento pirata', familia: 'izquierda', eje: -0.3, intervencion: 2,
+    desc: 'Internet libre, transparencia total y democracia directa.',
+    afinidad: { libertad: 2, global: 1, social: 1, autoridad: -2, tradicion: -1 },
+    grupos: { jovenes: 0.4, campesinos: -0.2 },
+    rasgo: { texto: 'Gobierno abierto: tu influencia sube 5 puntos y los jóvenes te apoyan 3 más.', mods: { influencia: 5 }, grupos: { jovenes: 3 } },
+  },
+  socioliberalismo: {
+    nombre: 'Liberalismo social', familia: 'centro', eje: 0.3, intervencion: 2,
+    desc: 'Mercado libre con red de seguridad y libertades personales.',
+    afinidad: { libertad: 2, social: 1, global: 1, autoridad: -1 },
+    grupos: { jovenes: 0.15, empresarios: 0.15, campesinos: -0.1 },
+    rasgo: { texto: 'Reformismo: llevar una ley a votación cuesta 1 de capital político menos.', votar: -1 },
+  },
+  justicialismo: {
+    nombre: 'Justicialismo', familia: 'centro', eje: 0.2, intervencion: 3,
+    desc: 'Tercera posición: ni capitalismo ni comunismo, sino justicia social y nación.',
+    afinidad: { nacional: 2, social: 1, izquierda: 1, global: -1 },
+    grupos: { obreros: 0.3, campesinos: 0.1, empresarios: -0.2 },
+    rasgo: { texto: 'Justicia social: los obreros te apoyan 3 puntos más.', grupos: { obreros: 3 } },
+  },
+  liberal_conservadurismo: {
+    nombre: 'Liberalismo conservador', familia: 'derecha', eje: 1.3, intervencion: 1,
+    desc: 'Mercado libre en la economía y prudencia en las costumbres.',
+    afinidad: { derecha: 2, tradicion: 1, orden: 1, izquierda: -2 },
+    grupos: { empresarios: 0.5, campesinos: 0.1, obreros: -0.15, jovenes: -0.1 },
+    rasgo: { texto: 'Cuentas saneadas: los impuestos rinden un 5% más.', mods: { impuestos: 1.05 } },
+  },
+  anarcocapitalismo: {
+    nombre: 'Anarcocapitalismo', familia: 'derecha', eje: 1.9, intervencion: 0,
+    desc: 'Ningún Estado: todo, hasta la justicia, en manos de empresas.',
+    afinidad: { derecha: 2, libertad: 2, izquierda: -2, autoridad: -2, orden: -2, social: -2 },
+    grupos: { empresarios: 0.8, obreros: -0.4, campesinos: -0.1 },
+    rasgo: { texto: 'Sin burocracia: la administración cuesta un 30% menos, pero la estabilidad baja 5.', mods: { admin: 0.7 }, estabilidad: -5 },
+  },
+  nacionalpopulismo: {
+    nombre: 'Populismo de derechas', familia: 'derecha', eje: 1.7, intervencion: 2,
+    desc: 'El pueblo de siempre contra las élites y contra los de fuera.',
+    afinidad: { nacional: 2, orden: 1, tradicion: 1, global: -2, libertad: -1 },
+    grupos: { obreros: 0.2, campesinos: 0.2, jovenes: -0.15, empresarios: -0.1 },
+    rasgo: { texto: 'Plazas llenas: cada mitin da 2 puntos más de apoyo.', mitin: 2 },
+  },
+  integrismo: {
+    nombre: 'Integrismo religioso', familia: 'autoritaria', eje: 1.9, intervencion: 2,
+    desc: 'La ley de Dios por encima de la de los hombres.',
+    afinidad: { tradicion: 2, autoridad: 2, orden: 1, libertad: -2, social: -1, global: -1 },
+    grupos: { campesinos: 0.4, jovenes: -0.35 },
+    rasgo: { texto: 'Fe del pueblo: la estabilidad sube 4 puntos y los campesinos te apoyan 2 más.', estabilidad: 4, grupos: { campesinos: 2 } },
+  },
+});
+
+// Dónde cae cada doctrina en las costumbres, de 0 (muy progresista) a 4 (muy conservadora), y qué
+// forma de Estado prefiere. Quien crea un partido puede apartarse de las dos cosas.
+const NIVELES_SOCIAL = ['Muy progresista', 'Progresista', 'Moderado', 'Conservador', 'Muy conservador'];
+const DESC_SOCIAL = [
+  'Cambiar las costumbres cuanto antes: derechos nuevos y ninguna tradición intocable.',
+  'Más derechos y libertades personales, sin prisa pero sin pausa.',
+  'Ni cambiar por cambiar ni conservar por conservar.',
+  'Familia, costumbres y cambios solo cuando hacen falta.',
+  'La tradición no se toca: lo de siempre es lo que funciona.',
+];
+const SOCIAL_DOCTRINA = {
+  leninismo: 2, trotskismo: 1, maoismo: 2, anarquismo: 0, socialismo: 1, socialismo_mercado: 2, socialdemocracia: 1, ecologismo: 0, progresismo: 0,
+  centrismo: 2, tecnocracia: 2, regionalismo: 2, agrarismo: 3, democristiana: 3, liberalismo: 1, libertarismo: 1, conservadurismo: 4, nacionalismo: 4,
+  tradicionalismo: 4, falangismo: 4, fascismo: 4, eurocomunismo: 1, laborismo: 2, populismo_izq: 1, pirata: 0, socioliberalismo: 1, justicialismo: 3,
+  liberal_conservadurismo: 3, anarcocapitalismo: 1, nacionalpopulismo: 4, integrismo: 4,
+};
+const FORMA_DOCTRINA = {
+  leninismo: 'republica', trotskismo: 'republica', maoismo: 'republica', anarquismo: 'republica', socialismo: 'republica', eurocomunismo: 'republica',
+  populismo_izq: 'republica', progresismo: 'republica', ecologismo: 'republica', falangismo: 'republica', pirata: 'republica',
+  tradicionalismo: 'monarquia', conservadurismo: 'monarquia', liberal_conservadurismo: 'monarquia', integrismo: 'monarquia',
+};
+for (const id in DOCTRINAS) {
+  DOCTRINAS[id].social = id in SOCIAL_DOCTRINA ? SOCIAL_DOCTRINA[id] : 2;
+  DOCTRINAS[id].forma = FORMA_DOCTRINA[id] || 'neutral';
+}
+
+// Forma del Estado: lo que es el país y lo que defiende cada partido ('neutral' si le da igual).
+// grupos y estabilidad: lo que cambia mientras el país tiene esa forma.
+const FORMAS_ESTADO = {
+  monarquia: { nombre: 'Monarquía', desc: 'Un rey o una reina como jefe del Estado, por encima de los partidos.', estabilidad: 3, grupos: { campesinos: 2, jovenes: -2 } },
+  republica: { nombre: 'República', desc: 'El jefe del Estado se elige: nadie hereda el cargo.', estabilidad: 0, grupos: { jovenes: 2, obreros: 1, campesinos: -2 } },
+};
+const POSTURAS_FORMA = { monarquia: 'Monárquico', neutral: 'Le da igual', republica: 'Republicano' };
+// Lo que tira cada grupo hacia la monarquía (positivo) o hacia la república (negativo), de −1 a 1.
+const PREFERENCIA_FORMA = { obreros: -0.3, empresarios: 0.15, campesinos: 0.45, jovenes: -0.45 };
+const CP_REFERENDUM = 3;
+
 const DOCTRINA_BASE = 'centrismo';
 
 // afinidad: cuánto le gusta a cada partido cada tipo de ley (-2 a +2). base: fuerza electoral por grupo.
@@ -349,10 +479,38 @@ const CATALOGO_PARTIDOS = {
     base: { obreros: 8, empresarios: 6, campesinos: 16, jovenes: 6 },
   },
 };
+// Más partidos (versión 2.1). talla: su tamaño habitual; sus gustos y sus votantes salen de su doctrina.
+Object.assign(CATALOGO_PARTIDOS, {
+  pc: { nombre: 'Partido Comunista', siglas: 'PC', color: '#a32222', emblema: 'estrella', lema: 'El partido de la revolución: todo para el Estado obrero.', doctrina: 'leninismo', talla: 14 },
+  lr: { nombre: 'Liga Revolucionaria', siglas: 'LR', color: '#d1593f', emblema: 'antorcha', lema: 'Trotskistas: revolución en todas partes y ningún burócrata.', doctrina: 'trotskismo', talla: 7 },
+  cl: { nombre: 'Confederación Libertaria', siglas: 'CL', color: '#3d3d3d', emblema: 'llave', lema: 'Anarcosindicalistas: ni patronos ni ministros.', doctrina: 'anarquismo', talla: 7 },
+  iu: { nombre: 'Izquierda Unitaria', siglas: 'IU', color: '#c2185b', emblema: 'globo', lema: 'Comunistas de urna y sindicato.', doctrina: 'eurocomunismo', talla: 10 },
+  fp: { nombre: 'Fuerza Popular', siglas: 'FP', color: '#7d3c98', emblema: 'bombilla', lema: 'El pueblo contra los de arriba.', doctrina: 'populismo_izq', talla: 14 },
+  sd: { nombre: 'Partido Socialdemócrata', siglas: 'PSD', color: '#e0567f', emblema: 'gente', lema: 'Bienestar para todos sin romper el mercado.', doctrina: 'socialdemocracia', talla: 24 },
+  pt: { nombre: 'Partido del Trabajo', siglas: 'PT', color: '#cf6a32', emblema: 'martillo', lema: 'La voz de los sindicatos en el Parlamento.', doctrina: 'laborismo', talla: 15 },
+  rd: { nombre: 'Red Pirata', siglas: 'RP', color: '#5b6ee1', emblema: 'ancla', lema: 'Internet libre y política a la vista de todos.', doctrina: 'pirata', talla: 7 },
+  cr: { nombre: 'Centro Reformista', siglas: 'CR', color: '#e2a03f', emblema: 'diana', lema: 'Liberales con conciencia social.', doctrina: 'socioliberalismo', talla: 13 },
+  mj: { nombre: 'Movimiento Justicialista', siglas: 'MJ', color: '#4aa3c7', emblema: 'charla', lema: 'Justicia social, sindicatos y nación.', doctrina: 'justicialismo', talla: 14 },
+  ut: { nombre: 'Unión Tecnocrática', siglas: 'UT', color: '#607d8b', emblema: 'grafica', lema: 'Que gobiernen los que saben.', doctrina: 'tecnocracia', talla: 8 },
+  la: { nombre: 'Liga Agraria', siglas: 'LA', color: '#8d9b3a', emblema: 'trigo', lema: 'El campo manda: precios justos y pueblos vivos.', doctrina: 'agrarismo', talla: 12 },
+  dc: { nombre: 'Democracia Cristiana', siglas: 'DC', color: '#3f8fb5', emblema: 'casa', lema: 'Familia, fe y economía con rostro humano.', doctrina: 'democristiana', talla: 20 },
+  lc: { nombre: 'Partido Popular Liberal', siglas: 'PPL', color: '#2f6fb0', emblema: 'maletin', lema: 'Impuestos bajos y costumbres de siempre.', doctrina: 'liberal_conservadurismo', talla: 18 },
+  lb: { nombre: 'Partido Libertario', siglas: 'LIB', color: '#d4a017', emblema: 'moneda', lema: 'Menos Estado, menos impuestos, menos normas.', doctrina: 'libertarismo', talla: 9 },
+  rn: { nombre: 'Reagrupamiento del Pueblo', siglas: 'RDP', color: '#1f3a5f', emblema: 'candado', lema: 'Los de aquí primero, contra las élites y los de fuera.', doctrina: 'nacionalpopulismo', talla: 14 },
+  ct: { nombre: 'Comunión Tradicionalista', siglas: 'CT', color: '#7a5230', emblema: 'corona', lema: 'Trono, altar y fueros.', doctrina: 'tradicionalismo', talla: 8 },
+  pf: { nombre: 'Partido de la Fe', siglas: 'PF', color: '#5d4a8a', emblema: 'birrete', lema: 'La ley de Dios en la ley de los hombres.', doctrina: 'integrismo', talla: 7 },
+  fs: { nombre: 'Frente Sindicalista Nacional', siglas: 'FSN', color: '#34495e', emblema: 'espadas', lema: 'Patria, pan y sindicato único.', doctrina: 'falangismo', talla: 7 },
+  lp: { nombre: 'Legión Patriótica', siglas: 'LP', color: '#1c1c1c', emblema: 'bandera', lema: 'Un jefe, una nación, un Estado.', doctrina: 'fascismo', talla: 7 },
+});
+// Costumbres y forma de Estado de los partidos de siempre que se apartan de su doctrina.
+Object.assign(CATALOGO_PARTIDOS.va, { social: 1 });
+Object.assign(CATALOGO_PARTIDOS.pr, { social: 3 });
+Object.assign(CATALOGO_PARTIDOS.mn, { forma: 'monarquia' });
+
 const PARTIDOS_FIJOS = ['fo', 'va', 'uc', 'ac'];
-const PARTIDOS_EXTRA = ['pl', 'mn', 'ms', 'pr'];
-// Cuántos partidos hay en cada parlamento (los partidos propios de otros jugadores se suman aparte).
-const NUM_PARTIDOS = { 4: 'Clásico', 5: 'Animado', 6: 'Muy repartido', 8: 'Todos' };
+const MAX_PARTIDOS = 10;
+// Cuántos partidos hay en cada parlamento, contando el tuyo (los de otros jugadores del mismo país se suman aparte).
+const NUM_PARTIDOS = { 4: 'Pocos', 6: 'Normal', 8: 'Muchos', 10: 'Fragmentado' };
 // Los partidos del país que se está mirando y su orden en el hemiciclo. Los rellena activarPartidos().
 const PARTIDOS = {};
 const ORDEN_HEMICICLO = [];
@@ -714,7 +872,8 @@ const OBJETIVOS = [
   { id: 'mercado', texto: 'Abre un mercado', premio: { dinero: 60 }, hecho: s => contarEdificios(s).mercado >= 1 },
   { id: 'pais', texto: 'Anexiona un país entero', premio: { dinero: 250 }, hecho: s => Object.values(s.paises).some(p => p.porTi) },
   { id: 'fabricas', texto: 'Ten 5 fábricas', premio: { dinero: 150 }, hecho: s => contarEdificios(s).fabrica >= 5 },
-  { id: 'absoluta', texto: 'Consigue mayoría absoluta: 51 escaños', premio: { dinero: 200 }, hecho: s => s.escanos[ID_JUGADOR] >= 51 },
+  { id: 'absoluta', texto: 'Consigue la mayoría absoluta tú solo', premio: { dinero: 200 }, hecho: s => s.escanos[ID_JUGADOR] >= MAYORIA },
+  { id: 'pacto', texto: 'Cierra un pacto con otro partido', premio: { cp: 1 }, hecho: s => Object.keys(s.pactos || {}).length >= 1 },
 ];
 
 // ---------- Carrera política ----------
@@ -722,7 +881,14 @@ const OBJETIVOS = [
 // Quien dirige tu partido al empezar la carrera. Cambia en cada partida (lo fija usarNacion).
 let LIDER_INICIAL = 'Marta Solís';
 const NOMBRES_LIDERES = ['Marta Solís', 'Julia Ortiz', 'Ramón Aguirre', 'Carmen Llorente', 'Pablo Ferrán', 'Inés Robles', 'Víctor Salgado', 'Elena Cuesta',
-  'Jorge Barrios', 'Lucía Montes', 'Andrés Pizarro', 'Nuria Serrano', 'Óscar Lamas', 'Beatriz Ocaña', 'Hugo Tejedor', 'Sara Villalba', 'Diego Navarro', 'Alba Quiroga'];
+  'Jorge Barrios', 'Lucía Montes', 'Andrés Pizarro', 'Nuria Serrano', 'Óscar Lamas', 'Beatriz Ocaña', 'Hugo Tejedor', 'Sara Villalba', 'Diego Navarro', 'Alba Quiroga',
+  'Teresa Maldonado', 'Rubén Castaño', 'Irene Bustos', 'Mateo Zubiri', 'Paula Requena', 'Germán Ochoa', 'Lidia Carrasco', 'Tomás Belmonte', 'Noelia Arranz',
+  'Emilio Varela', 'Rocío Palacios', 'Santiago Mur', 'Aitana Cebrián', 'Fermín Lozano'];
+// Gente que puede ser ministro: cada partida reparte unos cuantos entre los partidos de su parlamento.
+const NOMBRES_MINISTROS = ['Elena Marqués', 'Tomás Rivas', 'Lucía Ferrer', 'Andrés Coll', 'Rosa Vidal', 'Iván Herrero', 'Gonzalo de Luna', 'Beatriz Sandoval',
+  'Nora Prats', 'Samuel Ortega', 'Clara Ibáñez', 'Hugo Bermejo', 'Marina Acosta', 'Felipe Cárdenas', 'Olga Montiel', 'Raúl Espejo', 'Julia Cano', 'Daniel Pons',
+  'Sofía Lerma', 'Marcos Tena', 'Adela Rueda', 'Bruno Castells', 'Eva Solano', 'Jaime Urrutia', 'Mónica Vera', 'César Aldana', 'Pilar Etxea', 'Simón Garrido',
+  'Laura Benet', 'Ignacio Rojo', 'Carla Mediavilla', 'Alberto Feijoo'];
 const MES_CONGRESO = 10;
 const MAX_PROMESAS = 3;
 
@@ -848,6 +1014,17 @@ const OBJETIVOS_CARRERA = [
   { id: 'c_lider', texto: 'Gana el congreso del partido', premio: { cp: 3 }, hecho: s => esLider(s) },
   { id: 'c_promesas', texto: 'Haz tres promesas electorales', premio: { prestigio: 4 }, hecho: s => s.carrera.promesas.length >= MAX_PROMESAS },
   { id: 'c_primero', texto: 'Ponte primero en las encuestas', premio: { fondos: 80 }, hecho: s => ganaJugador(estimarVotos(s, false)) },
+];
+
+// Metas del modo provincial: de una sola sede al gobierno.
+const OBJETIVOS_PROVINCIAL = [
+  { id: 'p_sede2', texto: 'Abre una segunda sede', premio: { fondos: 40 }, hecho: s => Object.keys(s.carrera.sedes || {}).length >= 2 },
+  { id: 'p_prestigio', texto: 'Alcanza 20 de prestigio', premio: { fondos: 40 }, hecho: s => s.carrera.prestigio >= 20 },
+  { id: 'p_escano', texto: 'Consigue tu primer escaño', premio: { cp: 3 }, hecho: s => s.escanos[ID_JUGADOR] >= 1 },
+  { id: 'p_mitad', texto: 'Ten sede en la mitad de las provincias', premio: { fondos: 80 }, hecho: s => Object.keys(s.carrera.sedes || {}).length * 2 >= provinciasJugador().length },
+  { id: 'p_ley', texto: 'Lleva una ley a votación', premio: { prestigio: 4 }, hecho: s => s.cuenta.propuestas >= 1 },
+  { id: 'p_50', texto: 'Llega a 50 escaños', premio: { fondos: 100 }, hecho: s => s.escanos[ID_JUGADOR] >= 50 },
+  { id: 'p_todas', texto: 'Ten sede en todas las provincias', premio: { prestigio: 6 }, hecho: s => Object.keys(s.carrera.sedes || {}).length >= provinciasJugador().length },
 ];
 
 const LEY_POR_ID = Object.fromEntries(LEYES.map(l => [l.id, l]));

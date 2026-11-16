@@ -59,6 +59,7 @@ const I18N = (() => {
     patrones[id].push({
       re: new RegExp('^' + fijos.map(escaparRe).join('(.+?)') + '$'),
       partes, peso: n, fuerte: n >= 6, libres: marcas.map(m => m === '{*}'), ancla: ancla.length >= 3 ? ancla : '',
+      abierto: fijos[fijos.length - 1] === '',
     });
   }
 
@@ -75,14 +76,22 @@ const I18N = (() => {
     : n.replace(/(\d)\.(\d{3})(?!\d)/g, '$1\u0000$2').replace(/(\d),(\d{1,2})(?!\d)/g, '$1.$2').replace(/\u0000/g, ','));
 
   // Devuelve la traducción de una clave ya limpia, o null si no se sabe.
-  function buscar(clave, nivel) {
-    const directa = exactas[idioma].get(clave);
-    if (directa !== undefined) return directa;
+  // cuales: 'fuertes' mira solo el diccionario y los patrones con bastante texto fijo; 'flojos', solo
+  // los que apenas tienen; sin nada, todos.
+  function buscar(clave, nivel, cuales) {
+    if (cuales !== 'flojos') {
+      const directa = exactas[idioma].get(clave);
+      if (directa !== undefined) return directa;
+    }
     if (nivel > 4 || clave.length > 600) return null;
     for (const p of lista(idioma)) {
+      if (cuales && p.fuerte !== (cuales === 'fuertes')) continue;
       if (p.ancla && !clave.includes(p.ancla)) continue;
       const m = p.re.exec(clave);
       if (!m) continue;
+      // Un hueco no puede tragarse frases enteras, salvo el que cierra el texto: si lo hace, es otro
+      // texto que acaba igual («Ganarías. La mayoría son 176 de los 350 escaños.» no es «{} de {} escaños»).
+      if (m.some((v, i) => i > 0 && !(p.abierto && i === m.length - 1) && v.length > 25 && /[.!?…]\s+\S/.test(v))) continue;
       const valores = [];
       let vale = true;
       for (let i = 1; i < m.length && vale; i++) {
@@ -106,13 +115,18 @@ const I18N = (() => {
 
   // La traducción de un texto, tal cual o con pequeñas variaciones: con punto final, seguido de una
   // cifra («Obreros +8») o con otras mayúsculas. null si no se sabe.
+  // Los patrones flojos («{} de {}») se dejan para el final: antes se prueba la misma frase sin su
+  // punto, que suele tener una traducción propia y mejor.
   function saber(n, nivel) {
-    let tr = buscar(n, nivel);
-    if (tr !== null || nivel > 4) return tr;
+    let tr = buscar(n, nivel, 'fuertes');
+    if (tr !== null) return tr;
+    if (nivel > 4) return buscar(n, nivel, 'flojos');
     if (n.length > 2 && n.endsWith('.') && !n.endsWith('..')) {
       tr = saber(n.slice(0, -1), nivel + 1);
       if (tr !== null) return tr + '.';
     }
+    tr = buscar(n, nivel, 'flojos');
+    if (tr !== null) return tr;
     const cifra = /^(.*\S) ([+\-−±]?\d[\d.,:/%]*)$/.exec(n);
     if (cifra && LETRA.test(cifra[1])) {
       tr = saber(cifra[1], nivel + 1);

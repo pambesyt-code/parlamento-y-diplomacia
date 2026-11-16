@@ -90,7 +90,7 @@ function tabOposicion() {
     <div class="tarjeta resaltada">
       <div class="tarjeta-cab"><b>Elecciones</b><span class="cuenta">en ${plural(faltan, 'mes', 'meses')}</span></div>
       <p>Si tu partido saca más escaños que el del gobierno, pasas a gobernar tú. Así va la encuesta:</p>
-      ${duelo([[esc(P.nombre), enc[o.partido], P.color], [esc(G.nombre), enc[ID_JUGADOR], G.color]], 50)}
+      ${duelo([[esc(P.nombre), enc[o.partido], P.color], [esc(G.nombre), enc[ID_JUGADOR], G.color]], MAYORIA)}
     </div>
     <h3>Qué haces este mes <span class="cuenta">${o.cp} de ${CP_MAXIMO} de capital político</span></h3>
     <div class="edif"><span class="edif-ico">${ico('megafono')}</span><div class="edif-txt"><b>${ACCIONES_OPOSICION.mitin.nombre}</b>

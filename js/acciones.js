@@ -25,6 +25,11 @@ const REGLAS = {
   mitin: (s, d) => darMitin(s, d.v),
   evento: (s, d) => resolverEvento(s, +d.i),
   cerrarElecciones: s => { s.elecciones = null; },
+  // Pactos de gobierno, investidura y forma del Estado
+  pactar: (s, d) => pactar(s, d.partido),
+  romperPacto: (s, d) => romperPacto(s, d.partido),
+  investir: s => investir(s),
+  referendum: s => convocarReferendum(s),
 
   // Diplomacia y guerra
   diplo: (s, d) => accionDiplomatica(s, d.pais, d.accion),
@@ -44,6 +49,9 @@ const REGLAS = {
   formarGobierno: s => formarGobierno(s),
   cerrarCaida: s => { s.caida = null; },
   corrupcion: (s, d) => hacerCorrupcion(s, d.v),
+  // Partido provincial: dónde nace y dónde abre o mejora sedes
+  fundar: (s, d) => fundarPartido(s, d.prov),
+  sede: (s, d) => ponerSede(s, d.prov),
 
   // Solo en solitario: en multijugador el mes lo pasa el anfitrión cuando todos están listos.
   mes: s => siguienteMes(s),

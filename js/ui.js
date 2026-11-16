@@ -238,6 +238,10 @@ const statCP = {
   k: 'cp', nombre: 'Capital político', icono: 'estrella', tip: 'Se gasta en casi todo lo que haces. Recuperas 2 cada mes.',
   valor: s => s.cp, fmt: n => `${n}/${CP_MAXIMO}`, delta: s => [`+${cpAlMes(s)} al mes`, ''],
 };
+const statFondos = {
+  k: 'fondos', nombre: 'Fondos', icono: 'moneda', tip: 'Dinero para mítines, sedes y campañas', valor: s => s.carrera.fondos,
+  delta: s => [`+${5 + (esProvincial(s) ? 2 * numSedes(s) : 0)} al mes`, ''],
+};
 const STATS = {
   gobierno: [
     statFecha,
@@ -250,7 +254,7 @@ const STATS = {
     statCP,
     { k: 'influencia', nombre: 'Influencia', icono: 'globo', tip: 'Peso de tu país en el exterior. Cada punto mejora un 0,3% lo que exportas.', valor: s => influencia(s) },
     {
-      k: 'elecciones', nombre: 'Elecciones', icono: 'urna', tip: 'Debes seguir siendo el partido con más escaños',
+      k: 'elecciones', nombre: 'Elecciones', icono: 'urna', tip: 'Para seguir gobernando necesitas mayoría absoluta, tú solo o con tus socios',
       texto: s => `en ${plural(faltanElecciones(s), 'mes', 'meses')}`, alerta: s => faltanElecciones(s) <= 3,
     },
   ],
@@ -265,7 +269,7 @@ const STATS = {
       valor: s => s.carrera.interno, alerta: s => esLider(s) && s.carrera.interno < 35,
       delta: s => (esLider(s) ? ['mínimo 25', ''] : [`${LIDER_INICIAL}: ${s.carrera.apoyoLider}`, '']),
     },
-    { k: 'fondos', nombre: 'Fondos', icono: 'moneda', tip: 'Dinero para mítines, cenas y campañas', valor: s => s.carrera.fondos, delta: () => ['+5 al mes', ''] },
+    statFondos,
     statCP,
     {
       k: 'encuesta', nombre: 'Encuesta', icono: 'grafica', tip: 'Escaños que sacaría hoy tu partido', valor: s => estimarVotos(s, false)[ID_JUGADOR],
@@ -279,6 +283,12 @@ const STATS = {
   ],
 };
 
+// La cabecera de un partido provincial: en vez del apoyo interno, hasta dónde llegan sus sedes.
+STATS.provincial = STATS.carrera.map(st => (st.k !== 'interno' ? st : {
+  k: 'alcance', nombre: 'Implantación', icono: 'mapa', tip: 'Parte de los votantes del país a la que llegas con tus sedes',
+  valor: s => Math.round(alcance(s) * 100), fmt: n => n + '%', delta: s => [`${numSedes(s)} de ${provinciasJugador().length} provincias`, ''],
+}));
+
 // La cabecera de quien está en la oposición de un país compartido.
 STATS.oposicion = [
   statFecha,
@@ -291,7 +301,7 @@ STATS.oposicion = [
   { k: 'elecciones', nombre: 'Elecciones', icono: 'urna', tip: 'Si sacas más escaños que el gobierno, gobiernas tú', texto: s => `en ${plural(faltanElecciones(s), 'mes', 'meses')}`, tab: 'oposicion' },
 ];
 // Al pulsar una cifra de la cabecera se abre la pestaña donde se explica.
-const TAB_DE_CIFRA = { dinero: 'economia', popularidad: 'sociedad', estabilidad: 'sociedad', influencia: 'diplomacia', elecciones: 'parlamento', prestigio: 'carrera', interno: 'partido', fondos: 'carrera', cita: 'carrera' };
+const TAB_DE_CIFRA = { dinero: 'economia', popularidad: 'sociedad', estabilidad: 'sociedad', influencia: 'diplomacia', elecciones: 'parlamento', prestigio: 'carrera', interno: 'partido', alcance: 'partido', fondos: 'carrera', cita: 'carrera' };
 
 function construirCabecera(modo) {
   $('#stats').innerHTML = STATS[modo].map(s => {
@@ -306,7 +316,7 @@ function construirCabecera(modo) {
 }
 
 function renderCabecera() {
-  const s = estado, oposicion = esOposicion(), clave = oposicion ? 'oposicion' : s.modo;
+  const s = estado, oposicion = esOposicion(), clave = oposicion ? 'oposicion' : esProvincial(s) ? 'provincial' : s.modo;
   const P = partidoInfo(s, oposicion ? miOpositor().partido : ID_JUGADOR);
   if (ui.statsModo !== clave) construirCabecera(clave);
   const cargo = oposicion ? 'Oposición:' : s.modo === 'gobierno' ? 'Gobierno de' : esLider(s) ? 'Lidera' : 'Diputado:';
@@ -511,41 +521,57 @@ function htmlModelo() {
       <p>${D.rasgo.texto}</p></div>` : ''}`;
 }
 
-function hemicicloSVG(escanos) {
+// Los asientos del hemiciclo, de izquierda a derecha. Las filas de fuera llevan más asientos, para
+// que todos queden a la misma distancia unos de otros.
+const ASIENTOS = {};
+function asientosHemiciclo(total) {
+  if (ASIENTOS[total]) return ASIENTOS[total];
+  const denso = total > 150, filas = denso ? 10 : 4, r0 = denso ? 52 : 62, paso = denso ? 8 : 17;
+  const radios = Array.from({ length: filas }, (_, i) => r0 + i * paso), sumaR = radios.reduce((a, r) => a + r, 0);
+  const porFila = radios.map(r => Math.floor(total * r / sumaR));
+  for (let i = filas - 1, falta = total - porFila.reduce((a, n) => a + n, 0); falta > 0; i = (i + filas - 1) % filas, falta--) porFila[i]++;
   const asientos = [];
-  [19, 23, 27, 31].forEach((n, i) => {
-    const radio = 62 + i * 17;
-    for (let k = 0; k < n; k++) {
-      const a = Math.PI - (Math.PI * k) / (n - 1);
-      asientos.push({ a, x: 150 + radio * Math.cos(a), y: 128 - radio * Math.sin(a) });
+  radios.forEach((radio, i) => {
+    for (let k = 0; k < porFila[i]; k++) {
+      const a = Math.PI - (Math.PI * k) / Math.max(1, porFila[i] - 1);
+      asientos.push({ a, x: (150 + radio * Math.cos(a)).toFixed(1), y: (128 - radio * Math.sin(a)).toFixed(1) });
     }
   });
-  asientos.sort((p, q) => q.a - p.a);
+  return (ASIENTOS[total] = asientos.sort((p, q) => q.a - p.a));
+}
+
+function hemicicloSVG(escanos) {
+  const total = ORDEN_HEMICICLO.reduce((a, pid) => a + (escanos[pid] || 0), 0), asientos = asientosHemiciclo(total), r = total > 150 ? 3.1 : 5;
   let i = 0, html = '';
   for (const pid of ORDEN_HEMICICLO) {
     const color = partidoInfo(estado, pid).color;
-    for (let k = 0; k < escanos[pid]; k++, i++) {
-      html += `<circle class="esc" data-p="${pid}" cx="${asientos[i].x.toFixed(1)}" cy="${asientos[i].y.toFixed(1)}" r="5" fill="${color}" stroke="${color}"/>`;
+    for (let k = 0; k < (escanos[pid] || 0); k++, i++) {
+      html += `<circle class="esc" data-p="${pid}" cx="${asientos[i].x}" cy="${asientos[i].y}" r="${r}" fill="${color}" stroke="${color}"/>`;
     }
   }
-  return `<svg class="hemiciclo" viewBox="0 0 300 136" role="img" aria-label="Reparto de escaños">${html}</svg>`;
+  return `<svg class="hemiciclo ${total > 150 ? 'denso' : ''}" viewBox="0 0 300 136" role="img" aria-label="Reparto de escaños">${html}</svg>`;
 }
 
 function tabParlamento() {
   const s = estado, enc = estimarVotos(s, false), carrera = s.modo === 'carrera';
-  const pronostico = carrera
-    ? (ganaJugador(enc) ? 'Tu partido sería el más votado.' : `Hoy ganaría ${nombrePartido(masVotado(enc))}.`)
-    : (ganaJugador(enc) ? 'Seguirías siendo el partido más votado.' : 'Con estos números perderías el gobierno.');
+  const pactos = usaPactos(s), bloque = pactos && !carrera ? escanosBloque(s, enc) : enc[ID_JUGADOR];
+  const pronostico = enc[ID_JUGADOR] >= MAYORIA && pactos ? 'Tu partido tendría mayoría absoluta.'
+    : carrera ? (ganaJugador(enc) ? 'Tu partido sería el más votado.' : `Hoy ganaría ${nombrePartido(masVotado(enc))}.`)
+      : !pactos ? (ganaJugador(enc) ? 'Seguirías siendo el partido más votado.' : 'Con estos números perderías el gobierno.')
+        : bloque >= MAYORIA ? 'Con tus socios de ahora mantendrías la mayoría absoluta.'
+          : ganaJugador(enc) ? 'Serías el más votado, pero sin mayoría absoluta: tendrías que negociar la investidura.' : 'Con estos números te costaría seguir gobernando.';
+  const esSocio = pid => (carrera ? (s.sociosIA || []).includes(pid) : pactos && !!s.pactos[pid]);
   let html = `<h2>Parlamento</h2>${hemicicloSVG(s.escanos)}
     <div class="leyenda">${ORDEN_HEMICICLO.map(pid => {
       const P = partidoInfo(s, pid), rel = P.jugador ? 0 : relacionPartido(s, pid);
       const gobierna = carrera ? pid === s.gobiernoIA : P.jugador;
-      return `<div title="${esc(nombreDoctrina(s, pid))}">${logoPartido(P, 'mini')}<b>${esc(P.nombre)}</b><small class="lider">${esc(P.lider)}</small><span>${s.escanos[pid]} escaños</span>${gobierna ? chip('gobierna') : ''}${P.humano ? chip('jugador', 'pos') : ''}
+      return `<div title="${esc(nombreDoctrina(s, pid))}">${logoPartido(P, 'mini')}<b>${esc(P.nombre)}</b><small class="lider">${esc(P.lider)}</small><span>${s.escanos[pid]} escaños</span>${gobierna ? chip('gobierna') : esSocio(pid) ? chip('socio') : ''}${P.humano ? chip('jugador', 'pos') : ''}
         ${P.jugador ? '<span class="cuenta">tu partido</span>' : `<span class="cuenta ${clase(rel)}">relación ${signo(rel) || '0'}</span>`}</div>`;
     }).join('')}</div>
     <div class="encuesta"><div class="tarjeta-cab"><b>Encuesta</b><span class="cuenta">si hoy hubiera elecciones</span></div>
-      <div class="encuesta-barra">${ORDEN_HEMICICLO.map(pid => `<span style="width:${enc[pid]}%;background:${partidoInfo(s, pid).color}" title="${nombrePartido(pid)}: ${enc[pid]} escaños">${enc[pid]}</span>`).join('')}</div>
-      <p class="nota">${pronostico}</p></div>`;
+      <div class="encuesta-barra">${ORDEN_HEMICICLO.map(pid => `<span style="width:${enc[pid] / ESCANOS * 100}%;background:${partidoInfo(s, pid).color}" title="${nombrePartido(pid)}: ${enc[pid]} escaños">${enc[pid] >= 18 ? enc[pid] : ''}</span>`).join('')}</div>
+      <p class="nota">${pronostico} La mayoría absoluta son ${MAYORIA} de los ${ESCANOS} escaños.</p></div>
+    ${htmlPactos()}`;
   if (carrera) {
     html += `<p class="nota">Desde la oposición también puedes llevar leyes al pleno. Si sale adelante ganas ${esLider(s) ? 5 : 8} de prestigio,
       4 de apoyo en el partido y mejor imagen entre quienes se benefician. Y seguirá en vigor cuando gobiernes, con su coste.</p>`;
@@ -572,7 +598,7 @@ function tabParlamento() {
         const porque = P.jugador
           ? (d.voto === 'si' ? 'Tu partido respalda la propuesta' : `La dirección no te respalda: te hacen falta ${APOYO_PARA_RESPALDO} de apoyo en el partido`)
           : d.humano ? `Lo dirige otro jugador, ${esc(P.lider)}: decidirá su voto cuando lleves la ley al pleno`
-          : `Ideología ${signo(d.ideologia) || '0'}, relación ${signo(d.relacion) || '0'}${d.negociado ? `, negociado +${d.negociado}` : ''}`;
+          : `Ideología ${signo(d.ideologia) || '0'}, relación ${signo(d.relacion) || '0'}${d.negociado ? `, negociado +${d.negociado}` : ''}${d.pacto ? `, pacto +${d.pacto}` : ''}`;
         return `<div class="voto">${logoPartido(P, 'mini')}
           <div class="voto-txt"><b>${esc(P.siglas)}</b> ${s.escanos[pid]} escaños<small>${porque}</small></div>
           <div class="voto-der"><span class="intencion ${d.voto}">${d.humano ? 'Previsto: ' : ''}${votoTxt[d.voto]}</span>
@@ -612,9 +638,11 @@ function partidoDe(c) {
 function tabGobierno() {
   const s = estado;
   return `<h2>Gobierno</h2>
+    ${htmlFormaEstado()}
+    <h3>Gabinete</h3>
     <p class="nota">Cada ministro da una ventaja según su nivel y cobra 4 al mes. Si es de otro partido, tu relación con ese partido sube 12 mientras siga en el cargo.</p>
     ${Object.keys(CARTERAS).map(id => {
-      const C = CARTERAS[id], actual = s.ministros[id] && CAND_POR_ID[s.ministros[id]];
+      const C = CARTERAS[id], actual = s.ministros[id] && candPorId(s, s.ministros[id]);
       let cuerpo;
       if (actual) {
         const n = nivelCandidato(actual, id);
@@ -622,7 +650,7 @@ function tabGobierno() {
           <button class="enlace peligro" data-a="destituir" data-v="${id}">Destituir</button></div>
           <div class="chips">${chip(C.efecto(n), 'pos')}</div>`;
       } else if (ui.cartera === id) {
-        const libres = CANDIDATOS.filter(c => !Object.values(s.ministros).includes(c.id)).sort((a, b) => nivelCandidato(b, id) - nivelCandidato(a, id));
+        const libres = candidatosDe(s).filter(c => !Object.values(s.ministros).includes(c.id)).sort((a, b) => nivelCandidato(b, id) - nivelCandidato(a, id));
         cuerpo = `<div class="candidatos">${libres.map(c => {
           const n = nivelCandidato(c, id);
           return `<div class="candidato"><div><b>${c.nombre}</b>${estrellas(n)}<div>${partidoDe(c)}<small>${C.efecto(n)}</small></div></div>
@@ -664,7 +692,7 @@ function tabDiplomacia() {
       const rival = P.rival && s.paises[P.rival] && !s.paises[P.rival].eliminado ? PAISES[P.rival].nombre : null;
       // Guerras que este país libra con otros vecinos: se ven aquí y en las noticias.
       const enLiza = s.mundo.guerras.filter(g => g.a === pid || g.b === pid).map(g => PAISES[g.a === pid ? g.b : g.a].nombre);
-      const estados = [P.humano && chip(`Jugador: ${esc(P.lider || '')}`, 'pos'), guerra && chip('En guerra contigo', 'neg'), p.tratado && chip(`Tratado: +${P.comercio} al mes`, 'pos'), p.alianza && chip('Aliado', 'pos'),
+      const estados = [P.humano && chip(`Jugador: ${esc(P.lider || '')}`, 'pos'), guerra && chip('En guerra contigo', 'neg'), p.tratado && chip(`Tratado: +${comercioDe(s, pid)} al mes`, 'pos'), p.alianza && chip('Aliado', 'pos'),
         !guerra && hayEmbargo(s, pid) && chip('Embargo: −20 al mes', 'neg'), P.requierePuerto && !p.tratado && !guerra && chip('Comerciar exige un puerto'),
         p.tregua > s.mes && chip(`Tregua hasta ${fecha(p.tregua)}`), enLiza.length && chip(`En guerra con ${enLiza.join(' y ')}`)].filter(Boolean).join('');
       const acciones = Object.keys(ACCIONES_DIPLO).map(a => {
@@ -676,7 +704,8 @@ function tabDiplomacia() {
       return `<div class="tarjeta ${ui.pais === pid ? 'resaltada' : ''}">
         <div class="tarjeta-cab"><b>${bandera(pid)} ${P.nombre}</b><span class="cuenta ${clase(p.relacion)}">relación ${signo(p.relacion) || '0'}</span></div>
         <div class="barra-rel"><span style="left:${(p.relacion + 100) / 2}%"></span></div>
-        <p>${P.gobierno}. ${P.desc}${rival ? ` Rival de ${rival}: lo que le das a uno molesta al otro.` : ''}</p>
+        <p>${nombreRegimen(s, pid)}. ${P.desc}${rival ? ` Rival de ${rival}: lo que le das a uno molesta al otro.` : ''}</p>
+        ${chipsRegimen(s, pid) ? `<div class="chips">${chipsRegimen(s, pid)}</div>` : ''}
         <div class="fila"><span>${ico('espadas')} Ejército</span><b>${p.ejercito}, y tu fuerza es ${fuerzaPropia(s)}</b></div>
         <div class="fila"><span>${ico('mapa')} Provincias</span><b>${provinciasDe(pid).length}</b></div>
         ${estados ? `<div class="chips">${estados}</div>` : ''}
@@ -833,8 +862,8 @@ function revelarPartido(pid, cuenta, conAnim) {
   const v = votoEnPantalla();
   if (!v) return;
   const voto = v.votos[pid];
-  $$(`#modal .esc[data-p="${pid}"]`).forEach((c, i) => {
-    c.style.transitionDelay = conAnim ? `${i * 14}ms` : '0ms';
+  $$(`#modal .esc[data-p="${pid}"]`).forEach((c, i, todos) => {
+    c.style.transitionDelay = conAnim ? `${Math.round(i * Math.min(14, 600 / todos.length))}ms` : '0ms';
     c.classList.add('v-' + voto);
   });
   const fila = $(`#modal .vp[data-p="${pid}"]`);
@@ -875,55 +904,74 @@ function animarVotacion() {
 
 function htmlElecciones() {
   const s = estado, e = s.elecciones;
-  const orden = Object.keys(PARTIDOS).sort((a, b) => e.escanos[b] - e.escanos[a]);
+  const orden = Object.keys(PARTIDOS).sort((a, b) => e.escanos[b] - e.escanos[a]), tope = topeElecciones(e);
   return `<h2>Noche electoral</h2>
-    <p class="nota">Recuento de los 100 escaños del Parlamento.</p>
+    <p class="nota">Recuento de los ${ESCANOS} escaños del Parlamento. La mayoría absoluta son ${MAYORIA}.</p>
     <div class="resultados">${orden.map(pid => {
       const P = partidoInfo(s, pid), dif = e.escanos[pid] - e.antes[pid];
       return `<div class="res" data-p="${pid}">${logoPartido(P, 'mini')}<span class="res-n">${esc(P.nombre)}</span>
-        <div class="res-b"><span style="width:${e.antes[pid]}%;background:${P.color}"></span></div>
+        <div class="res-b"><span style="width:${e.antes[pid] / tope * 100}%;background:${P.color}"></span></div>
         <b>${e.antes[pid]}</b><small class="${clase(dif)}">${signo(dif) || '='}</small></div>`;
     }).join('')}</div>
-    ${e.carrera ? veredictoCarrera(e, orden[0]) : `<p id="veredicto" class="veredicto ${e.gana ? 'pos' : 'neg'}">${e.gana
+    ${e.investidura ? veredictoInvestidura() : e.carrera ? veredictoCarrera(e, orden[0]) : `<p id="veredicto" class="veredicto ${e.gana ? 'pos' : 'neg'}">${e.gana
       ? (e.relevo ? `${esc(e.relevo.entra)} gana con ${nombrePartido(ID_JUGADOR)} y forma gobierno. ${esc(e.relevo.sale)} pasa a la oposición.`
-        : `${nombrePartido(ID_JUGADOR)} es la fuerza con más escaños. Sigues al frente del gobierno.`)
-      : `${nombrePartido(orden[0])} te ha superado. Pierdes el gobierno, pero no la partida: pasas a liderar la oposición.`}</p>
+        : usaPactos(s) ? `${nombrePartido(ID_JUGADOR)} consigue la mayoría absoluta. Sigues al frente del gobierno sin depender de nadie.`
+          : `${nombrePartido(ID_JUGADOR)} es la fuerza con más escaños. Sigues al frente del gobierno.`)
+      : s.gobiernoIA && usaPactos(s) ? `Ni pactando te salen las cuentas: gobernará ${nombrePartido(s.gobiernoIA)}. Pierdes el gobierno, pero no la partida: pasas a liderar la oposición.`
+        : `${nombrePartido(orden[0])} te ha superado. Pierdes el gobierno, pero no la partida: pasas a liderar la oposición.`}</p>
     ${e.gana ? '<button class="btn principal" data-a="cerrarElecciones">Empezar la legislatura</button>'
       : e.caida ? '<button class="btn principal" data-a="cerrarElecciones">Pasar a la oposición</button>' : botonesFin()}`}`;
+}
+
+// El escaño más alto de la noche: lo que llena una barra del recuento.
+const topeElecciones = e => Math.max(1, ...Object.keys(e.escanos).map(pid => Math.max(e.escanos[pid], e.antes[pid] || 0)));
+
+// Nadie tiene mayoría absoluta y tu partido puede intentar gobernar: se abre la negociación.
+function veredictoInvestidura() {
+  return `<p id="veredicto" class="veredicto">Nadie llega a los ${MAYORIA} escaños de la mayoría absoluta. Gobernará el bloque que más apoyos reúna.</p>
+    <button class="btn principal" data-a="cerrarElecciones">Negociar la investidura</button>`;
 }
 
 // Final de la noche electoral cuando aún no gobiernas: ganas, sigues en la oposición o te echan.
 function veredictoCarrera(e, primero) {
   const s = estado;
+  // Quien gobierna no siempre es el más votado: manda el bloque que más escaños reúne.
+  if (!e.gana && s.gobiernoIA) primero = s.gobiernoIA;
   if (e.gana) {
     return `<p id="veredicto" class="veredicto pos">${nombrePartido(ID_JUGADOR)} gana las elecciones. Vas a ser jefe de gobierno de ${esc(PAIS_JUGADOR.nombre)}.</p>
       <button class="btn principal" data-a="formarGobierno">Formar gobierno</button>`;
   }
   if (s.fin) {
-    return `<p id="veredicto" class="veredicto neg">Gana ${nombrePartido(primero)}. No llegas a los escaños que te exigía el partido y te expulsa.</p>${botonesFin()}`;
+    return `<p id="veredicto" class="veredicto neg">Gobernará ${nombrePartido(primero)}. No llegas a los escaños que te exigía el partido y te expulsa.</p>${botonesFin()}`;
   }
   if (e.destituido) {
-    return `<p id="veredicto" class="veredicto neg">Gana ${nombrePartido(primero)}. El partido no te perdona la derrota: pierdes el liderazgo y vuelves a ser diputado.</p>
+    return `<p id="veredicto" class="veredicto neg">Gobernará ${nombrePartido(primero)}. El partido no te perdona la derrota: pierdes el liderazgo y vuelves a ser diputado.</p>
       <button class="btn principal" data-a="cerrarElecciones">Seguir</button>`;
   }
-  return `<p id="veredicto" class="veredicto neg">Gana ${nombrePartido(primero)}. Sigues como líder de la oposición, con el partido algo más inquieto.
+  if (esProvincial(s)) {
+    const sube = e.escanos[ID_JUGADOR] > e.antes[ID_JUGADOR];
+    return `<p id="veredicto" class="veredicto ${sube ? 'pos' : 'neg'}">${sube ? `${nombrePartido(ID_JUGADOR)} sube a ${e.escanos[ID_JUGADOR]} escaños.` : `${nombrePartido(ID_JUGADOR)} se queda en ${e.escanos[ID_JUGADOR]} escaños.`}
+      Gobernará ${nombrePartido(primero)}. Habrá elecciones de nuevo dentro de ${MESES_LEGISLATURA} meses.</p>
+    <button class="btn principal" data-a="cerrarElecciones">Seguir creciendo</button>`;
+  }
+  return `<p id="veredicto" class="veredicto neg">Gobernará ${nombrePartido(primero)}. Sigues como líder de la oposición, con el partido algo más inquieto.
       Habrá elecciones de nuevo dentro de ${MESES_LEGISLATURA} meses.</p>
     <button class="btn principal" data-a="cerrarElecciones">Seguir en la oposición</button>`;
 }
 
 function animarElecciones() {
   ui.animElec = 'hecha';
-  const e = estado.elecciones, conAnim = animar();
+  const e = estado.elecciones, conAnim = animar(), tope = topeElecciones(e);
   const mostrar = () => {
     const v = $('#veredicto');
     if (!v || !estado.elecciones) return;
     v.classList.add('visto');
-    Sonido.tocar(e.gana ? 'victoria' : 'derrota');
+    Sonido.tocar(e.gana || v.classList.contains('pos') ? 'victoria' : e.investidura ? 'evento' : 'derrota');
   };
   requestAnimationFrame(() => requestAnimationFrame(() => {
     $$('#modal .res').forEach(fila => {
       const pid = fila.dataset.p;
-      $('.res-b span', fila).style.width = e.escanos[pid] + '%';
+      $('.res-b span', fila).style.width = e.escanos[pid] / tope * 100 + '%';
       animarNumero($('b', fila), e.antes[pid], e.escanos[pid], undefined, 1500);
     });
   }));
@@ -979,6 +1027,7 @@ function renderModal() {
   if (ui.ventana === 'opciones') [tipo, html] = ['opciones', htmlOpciones()];
   else if (ui.ventana === 'ayuda') [tipo, html] = ['ayuda', htmlAyuda(false)];
   else if (ui.ventana === 'privacidad') [tipo, html] = ['ayuda', htmlPrivacidad()];
+  else if (ui.ventana === 'novedades') [tipo, html] = ['ayuda', htmlNovedades()];
   else if (ui.ventana === 'confirmar') [tipo, html] = ['confirmar', htmlConfirmar()];
   else if (ui.ventana === 'tutorial') [tipo, html] = ['tutorial', htmlElegirTutorial()];
   else if (enJuego && ui.ventana === 'noticias') [tipo, html] = ['noticias', htmlNoticias()];
@@ -995,6 +1044,7 @@ function renderModal() {
     if (s.batallas.length) [tipo, html] = ['batalla', htmlBatalla()];
     else if (s.resultadoVoto) [tipo, html] = ['voto', htmlVoto()];
     else if (s.elecciones) [tipo, html] = ['elecciones', htmlElecciones()];
+    else if (s.investidura) [tipo, html] = ['investidura', htmlInvestidura()];
     else if (s.congreso) [tipo, html] = ['congreso', htmlCongreso()];
     else if (s.caida && !s.fin) [tipo, html] = ['caida', htmlCaida()];
     else if (s.fin) [tipo, html] = ['fin', htmlFin()];
@@ -1003,7 +1053,9 @@ function renderModal() {
     else if (plenoPendiente()) [tipo, html] = ['pleno', htmlPleno()];
     else if (s.votacion) [tipo, html] = ['votacion', htmlVotacionGobierno()];
     else if (s.evento) [tipo, html] = ['evento', htmlEvento()];
-    else if (ui.ventana === 'intro') [tipo, html] = ['intro', htmlAyuda(true)];
+    else if (ui.ventana === 'intro') [tipo, html] = ['intro', esProvincial(s) ? htmlIntroProvincial() : htmlAyuda(true)];
+    // Lo primero en un partido provincial, en cuanto se cierra la bienvenida: dónde nace.
+    else if (s.fundar) [tipo, html] = ['fundar', htmlFundar()];
   }
   const modal = $('#modal');
   if (!html) {
@@ -1095,9 +1147,11 @@ const acciones = {
   paso: d => { ui.paso = +d.v; scrollTo(0, 0); },
   // Los valores llegan como texto desde el HTML: algunos campos son números o un sí/no.
   cfg: d => {
-    ui.cfg[d.k] = d.k === 'legislatura' || d.k === 'nPartidos' || d.k === 'intervencion' ? +d.v : d.k === 'propio' ? d.v === '1' : d.v;
-    // Al cambiar de doctrina, la intervención del Estado vuelve a la que esa doctrina defiende.
-    if (d.k === 'doctrina') ui.cfg.intervencion = DOCTRINAS[d.v].intervencion;
+    ui.cfg[d.k] = d.k === 'legislatura' || d.k === 'nPartidos' || d.k === 'intervencion' || d.k === 'social' ? +d.v : d.k === 'propio' ? d.v === '1' : d.v;
+    // Al cambiar de doctrina, todo lo demás vuelve a lo que esa doctrina defiende.
+    if (d.k === 'doctrina') Object.assign(ui.cfg, { intervencion: DOCTRINAS[d.v].intervencion, social: DOCTRINAS[d.v].social, forma: DOCTRINAS[d.v].forma });
+    // Un partido provincial lo fundas tú.
+    if (ui.cfg.modo === 'provincial') ui.cfg.propio = true;
   },
   cfgPrincipio: d => {
     const p = ui.cfg.principios, i = p.indexOf(d.v);
@@ -1208,6 +1262,19 @@ const acciones = {
   mitin: d => jugar('mitin', d),
   evento: d => jugar('evento', d),
   cerrarElecciones: () => { jugar('cerrarElecciones'); ui.animElec = ''; },
+  pactar: d => jugar('pactar', d),
+  romperPacto: d => jugar('romperPacto', d),
+  investir: () => {
+    const antes = estado.modo;
+    jugar('investir');
+    // De la oposición al gobierno: la partida cambia de pantallas.
+    if (!enRed() && antes === 'carrera' && estado.modo === 'gobierno') {
+      Object.assign(ui, { prov: null, tab: 'provincia', animTab: true, modoMapa: 'politico', ventana: ui.tutorial ? null : 'intro' });
+    }
+  },
+  referendum: () => jugar('referendum'),
+  fundar: d => jugar('fundar', d),
+  sede: d => jugar('sede', d),
 
   // Ejército y guerra
   reclutar: () => jugar('reclutar'),
@@ -1238,7 +1305,8 @@ const SONIDOS = {
   tab: 'pestana', construir: 'construir', demoler: 'construir', mes: 'mes', prestamo: 'moneda', nombrar: 'moneda', mitin: 'evento',
   accionCarrera: 'moneda', prometer: 'moneda', formarGobierno: 'victoria', saltarVoto: '', votar: '', postura: '',
   reclutar: 'construir', declarar: 'derrota', paz: 'moneda', atacar: '', impuestos: 'moneda', zoom: 'pestana', responder: 'moneda',
-  modelo: 'moneda', plenoVotar: '', oposCensura: 'derrota',
+  modelo: 'moneda', plenoVotar: '', oposCensura: 'derrota', pactar: 'moneda', romperPacto: 'rechazado', investir: 'evento', referendum: 'evento',
+  fundar: 'victoria', sede: 'construir',
 };
 
 document.addEventListener('click', ev => {

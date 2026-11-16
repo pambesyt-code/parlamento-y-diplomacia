@@ -12,7 +12,7 @@ function heroHemiciclo(colorCentro) {
     }
   });
   asientos.sort((p, q) => q.a - p.a);
-  const bloques = [[PARTIDOS.fo.color, 0.28], [PARTIDOS.va.color, 0.1], [colorCentro, 0.34], [PARTIDOS.ac.color, 0.28]];
+  const bloques = [[CATALOGO_PARTIDOS.fo.color, 0.28], [CATALOGO_PARTIDOS.va.color, 0.1], [colorCentro, 0.34], [CATALOGO_PARTIDOS.ac.color, 0.28]];
   let hasta = 0, i = 0, html = '';
   for (const [color, parte] of bloques) {
     hasta += parte * asientos.length;
@@ -75,6 +75,7 @@ function htmlMenuPrincipal() {
       ${botonMenu({ a: 'menuMulti' }, 'gente', 'Multijugador', 'En directo con amigos, con un código de sala')}
       ${novato ? '' : botonMenu({ a: 'tutorial' }, 'birrete', 'Tutorial', 'Partida de práctica guiada: simple o completa')}
       ${botonMenu({ a: 'abrir', v: 'ayuda' }, 'ayuda', 'Cómo se juega')}
+      ${botonMenu({ a: 'abrir', v: 'novedades' }, 'periodico', 'Novedades', 'Lo nuevo de cada versión')}
       ${botonMenu({ a: 'abrir', v: 'opciones' }, 'engranaje', 'Opciones')}
     </nav>
     ${htmlIdiomas()}
@@ -98,7 +99,7 @@ function tarjetasOpcion(k, opciones, actual, cls = '') {
 }
 
 function pasoTu(c) {
-  return `<div class="campo"><span>Cómo empiezas</span>${tarjetasOpcion('modo', MODOS_JUEGO, c.modo, 'dos')}</div>
+  return `<div class="campo"><span>Cómo empiezas</span>${tarjetasOpcion('modo', MODOS_JUEGO, c.modo)}</div>
     <label class="campo"><span>Tu nombre</span><input id="cfg-lider" maxlength="24" value="${esc(c.lider)}" autocomplete="off"></label>
     <div class="campo"><span>Dificultad</span>${tarjetasOpcion('dificultad', DIFICULTADES, c.dificultad)}</div>
     <div class="campo"><span>Cada cuánto hay elecciones</span><div class="segmento oscuro">
@@ -111,6 +112,10 @@ function pasoPartido(c) {
       <button class="dificultad ${c.propio ? 'activa' : ''}" data-a="cfg" data-k="propio" data-v="1" aria-pressed="${c.propio}"><b>Crear el tuyo</b><small>Eliges nombre, símbolos e ideología.</small></button>
       <button class="dificultad ${c.propio ? '' : 'activa'}" data-a="cfg" data-k="propio" data-v="0" aria-pressed="${!c.propio}"><b>Unirte a uno que ya existe</b><small>Heredas sus votantes y sus ideas.</small></button>
     </div></div>`;
+  // Un partido provincial siempre es nuevo: no hay nada que elegir.
+  if (c.modo === 'provincial') {
+    return `<p class="campo-nota">Vas a fundar un partido nuevo en una sola provincia. Dale nombre, símbolos e ideas.</p>${htmlPartidoPropio(c)}`;
+  }
   if (!c.propio) {
     return `${eleccion}<div class="campo"><span>A cuál te unes</span><div class="lista-partidos">
       ${Object.keys(CATALOGO_PARTIDOS).map(pid => {
@@ -119,7 +124,12 @@ function pasoPartido(c) {
           ${logoPartido(P)}<span><b>${P.nombre}</b><small>${DOCTRINAS[P.doctrina].nombre}. ${P.lema}</small><small>Le gustan las leyes de: ${ideas}</small></span></button>`;
       }).join('')}</div></div>`;
   }
-  return `${eleccion}
+  return `${eleccion}${htmlPartidoPropio(c)}`;
+}
+
+// Nombre, color, emblema e ideas del partido que creas.
+function htmlPartidoPropio(c) {
+  return `
     <div class="vista-partido">${logoPartido({ color: c.color, emblema: c.emblema }, 'grande')}
       <div><b id="vp-partido">${esc(c.partido)}</b><span id="vp-lider">Lo lidera ${esc(c.lider)}</span></div></div>
     <label class="campo"><span>Nombre del partido</span><input id="cfg-partido" maxlength="28" value="${esc(c.partido)}" autocomplete="off"></label>
@@ -136,7 +146,7 @@ function pasoPartido(c) {
 
 // Las ideas del partido que creas: su doctrina, cuánto Estado defiende y hasta dos causas más.
 function htmlIdeario(c) {
-  const D = DOCTRINAS[c.doctrina] || DOCTRINAS[DOCTRINA_BASE], nivel = nivelIntervencion(c);
+  const D = DOCTRINAS[c.doctrina] || DOCTRINAS[DOCTRINA_BASE], nivel = nivelIntervencion(c), social = nivelSocial(c), forma = posturaForma(c);
   const familias = Object.keys(FAMILIAS_DOCTRINA).map(f => `<div class="doc-familia"><span>${FAMILIAS_DOCTRINA[f]}</span><div class="doc-lista">
     ${Object.keys(DOCTRINAS).filter(id => DOCTRINAS[id].familia === f).map(id => `<button class="doc ${D === DOCTRINAS[id] ? 'activa' : ''}" data-a="cfg" data-k="doctrina" data-v="${id}" aria-pressed="${D === DOCTRINAS[id]}">${DOCTRINAS[id].nombre}</button>`).join('')}
     </div></div>`).join('');
@@ -154,6 +164,13 @@ function htmlIdeario(c) {
       <div class="segmento oscuro cinco">${ORDEN_MODELOS.map((m, i) => `<button class="${nivel === i ? 'activa' : ''}" data-a="cfg" data-k="intervencion" data-v="${i}" aria-pressed="${nivel === i}">${MODELOS[m].nombre}</button>`).join('')}</div>
       <p class="campo-nota">${MODELOS[ORDEN_MODELOS[nivel]].desc} ${nivel === D.intervencion ? 'Es lo que suele defender esta doctrina.' : 'Te apartas de lo que suele defender esta doctrina.'}
         Si llegas al gobierno, tus votantes esperarán que apliques este modelo.</p></div>
+    <div class="campo"><span>Costumbres: de progresista a conservador</span>
+      <div class="segmento oscuro cinco">${NIVELES_SOCIAL.map((n, i) => `<button class="${social === i ? 'activa' : ''}" data-a="cfg" data-k="social" data-v="${i}" aria-pressed="${social === i}">${n}</button>`).join('')}</div>
+      <p class="campo-nota">${DESC_SOCIAL[social]} ${social === D.social ? 'Es lo que suele defender esta doctrina.' : 'Te apartas de lo que suele defender esta doctrina.'}
+        Los conservadores gustan más en el campo y los progresistas entre los jóvenes. Solo pactan entre sí los partidos que se parecen.</p></div>
+    <div class="campo"><span>Monarquía o república</span>
+      <div class="segmento oscuro">${Object.keys(POSTURAS_FORMA).map(f => `<button class="${forma === f ? 'activa' : ''}" data-a="cfg" data-k="forma" data-v="${f}" aria-pressed="${forma === f}">${POSTURAS_FORMA[f]}</button>`).join('')}</div>
+      <p class="campo-nota">${forma === 'neutral' ? 'Tu partido no se moja: un referéndum ni le da ni le quita.' : 'Si gobiernas podrás convocar un referéndum: ganarlo te da apoyo y perderlo te lo quita.'}</p></div>
     <div class="campo"><span>Causas: hasta ${MAX_PRINCIPIOS} banderas más, o ninguna</span><div class="principios">
       ${causas.map(t => {
         const activo = c.principios.includes(t), opuesto = PRINCIPIOS[t].opuesto;
@@ -172,10 +189,11 @@ function pasoPais(c) {
     <div class="campo"><span>Su color en el mapa</span><div class="opciones-fila">
       ${COLORES_PAIS.map(col => `<button class="muestra ${col === c.colorPais ? 'activa' : ''}" data-a="cfg" data-k="colorPais" data-v="${col}" style="background:${col}" aria-label="Color ${col}" aria-pressed="${col === c.colorPais}"></button>`).join('')}
     </div></div>
+    <div class="campo"><span>Forma del Estado</span>${tarjetasOpcion('estado', FORMAS_ESTADO, c.estado, 'dos')}</div>
     <div class="campo"><span>Tamaño del mundo</span>${tarjetasOpcion('tamano', TAMANOS, c.tamano)}</div>
     <div class="campo"><span>Partidos en el parlamento</span><div class="segmento oscuro">
       ${Object.keys(NUM_PARTIDOS).map(n => `<button class="${+c.nPartidos === +n ? 'activa' : ''}" data-a="cfg" data-k="nPartidos" data-v="${n}" aria-pressed="${+c.nPartidos === +n}">${n} · ${NUM_PARTIDOS[n]}</button>`).join('')}
-    </div><p class="campo-nota">Con más partidos el voto se reparte más y cuesta más ganar.</p></div>
+    </div><p class="campo-nota">Cada partida salen partidos distintos, con fuerzas distintas. Con más partidos el voto se reparte más y hay que pactar más.</p></div>
     <div class="campo"><span>Mapa: cada número da un mundo distinto</span><div class="semilla">
       <input id="cfg-semilla" inputmode="numeric" maxlength="7" value="${c.semilla}" aria-label="Número del mapa">
       <button class="btn claro" data-a="otroMapa">${ico('mapa')} Generar otro</button></div></div>`;
@@ -193,7 +211,7 @@ function htmlNuevaPartida() {
     ${cuerpo}
     <div class="botones-paso">
       ${paso > 1 ? `<button class="btn claro" data-a="paso" data-v="${paso - 1}">${ico('atras')} Atrás</button>` : ''}
-      ${final ? `<button class="btn laton grande" data-a="empezar">${c.modo === 'carrera' ? 'Empezar la carrera' : 'Empezar a gobernar'}</button>`
+      ${final ? `<button class="btn laton grande" data-a="empezar">${c.modo === 'carrera' ? 'Empezar la carrera' : c.modo === 'provincial' ? 'Fundar el partido' : 'Empezar a gobernar'}</button>`
         : `<button class="btn laton grande" data-a="paso" data-v="${paso + 1}">Siguiente: ${PASOS_NUEVA[paso].toLowerCase()}</button>`}
     </div>`;
 }
@@ -210,7 +228,7 @@ function renderMenu() {
     ui.menuAnim = false;
   }
   // A la derecha: el mapa en el paso del país y el hemiciclo en todo lo demás.
-  const colorCentro = nueva && c.propio ? c.color : PARTIDOS.uc.color;
+  const colorCentro = nueva && c.propio ? c.color : CATALOGO_PARTIDOS.uc.color;
   ponerHTML($('#menu-hero'), nueva && ui.paso === 3 ? vistaMundo() : heroHemiciclo(colorCentro));
 }
 
@@ -254,7 +272,7 @@ function htmlOpciones() {
 
 function htmlAyuda(esIntro) {
   const punto = (icono, titulo, texto) => `<li>${ico(icono)}<div><b>${titulo}</b><span>${texto}</span></div></li>`;
-  if (esIntro && estado.modo === 'carrera') {
+  if (esIntro && estado.modo === 'carrera' && !esProvincial(estado)) {
     return `<h2>Tu primer día en el Parlamento</h2>
       <p>${esc(estado.config.lider)}, acabas de salir elegido diputado por ${esc(estado.config.partido)}. Gobierna ${PARTIDOS[estado.gobiernoIA].nombre}
         y tu partido lo dirige ${LIDER_INICIAL}. Cada turno es un mes.</p>
@@ -262,7 +280,7 @@ function htmlAyuda(esIntro) {
         ${punto('megafono', 'Hazte un nombre', 'Interviene en el pleno y sal en televisión para ganar prestigio.')}
         ${punto('gente', 'Gánate al partido', `Dentro de ${MES_CONGRESO} meses hay congreso. Para dirigirlo necesitas más apoyo que ${LIDER_INICIAL}.`)}
         ${punto('parlamento', 'Toma postura', 'Presenta tus propias leyes y decide qué dices de las del gobierno.')}
-        ${punto('urna', 'Gana las elecciones', 'Ya como líder, haz promesas y campaña. Si tu partido es el más votado, gobiernas.')}
+        ${punto('urna', 'Gana las elecciones', usaPactos(estado) ? `Ya como líder, haz promesas y campaña. Gobiernas con ${MAYORIA} escaños, tú solo o pactando con partidos afines.` : 'Ya como líder, haz promesas y campaña. Si tu partido es el más votado, gobiernas.')}
         ${punto('estrella', 'Capital político', 'Se gasta en casi todo lo que haces. Recuperas 2 cada mes.')}
       </ul>
       <p class="nota">Si pierdes el congreso o el liderazgo no se acaba la partida, pero el partido te marcará una directiva. Si no la cumples, te expulsa.</p>
@@ -271,11 +289,12 @@ function htmlAyuda(esIntro) {
   const promesas = esIntro && estado.promesas.length ? ` Tienes 12 meses para cumplir tus ${estado.promesas.length} promesas: las verás en Parlamento.` : '';
   return `<h2>${esIntro ? `Bienvenido al gobierno, ${esc(estado.config.lider)}` : 'Cómo se juega'}</h2>
     <p>${esIntro ? `${esc(estado.config.partido)} ha ganado las elecciones en ${esc(estado.config.pais)}.${promesas}`
-      : 'En la carrera política empiezas como diputado: gana prestigio, hazte con el partido y vence en las elecciones. Después, o si eliges gobierno directo, diriges el país así:'}
+      : 'En la carrera política empiezas como diputado: gana prestigio, hazte con el partido y vence en las elecciones. Con un partido provincial empiezas sin escaños y creces abriendo sedes. Después, o si eliges gobierno directo, diriges el país así:'}
       Cada turno es un mes y las elecciones llegan cada ${esIntro ? MESES_LEGISLATURA + ' meses' : 'legislatura'}.</p>
     <ul class="ayuda">
       ${punto('martillo', 'Construye', 'Pulsa una provincia y levanta granjas, minas, fábricas, puertos y más.')}
       ${punto('parlamento', 'Aprueba leyes', 'Necesitas más votos a favor que en contra. Negocia con los otros partidos.')}
+      ${punto('estrella', 'Pacta para gobernar', `Sin ${MAYORIA} de los ${ESCANOS} escaños necesitas socios de ideas cercanas. Cada uno pide una ley a cambio.`)}
       ${punto('balanza', 'Elige tu modelo económico', 'En Economía decides cuánto interviene el Estado. Tus votantes esperan el que defiende tu partido.')}
       ${punto('maletin', 'Forma gobierno', 'Cada ministro da una ventaja. Uno de otro partido te acerca a ese partido.')}
       ${punto('gente', 'Cuida a la gente', 'El apoyo de obreros, empresarios, campesinos y jóvenes decide tus escaños.')}

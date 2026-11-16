@@ -9,24 +9,86 @@ const esLider = s => !!s.carrera && s.carrera.cargo === 'lider';
 const apoyoCongreso = s => Math.round(s.carrera.interno + s.carrera.prestigio / 5);
 // La fama se olvida: cada mes pierdes una parte de tu prestigio, más cuanto más tienes.
 const olvidoPrestigio = s => Math.ceil(s.carrera.prestigio * 0.08);
-const accionesCarrera = s => ACCIONES_CARRERA.filter(a => !a.fase || a.fase === s.carrera.cargo);
+// Quien ha fundado su partido no tiene que ganarse a nadie dentro de él.
+const accionesCarrera = s => ACCIONES_CARRERA.filter(a => (!a.fase || a.fase === s.carrera.cargo) && !(esProvincial(s) && a.efectos.interno));
 // El modelo económico que aplica un partido de la IA cuando gobierna: el que defiende.
 const modeloDePartido = pid => ORDEN_MODELOS[(CATALOGO_PARTIDOS[pid] || { intervencion: 2 }).intervencion];
 
+// ---------- Partido provincial ----------
+// En el modo provincial fundas un partido en una sola provincia y sin escaños. Solo recoge votos
+// donde tiene sede, y más cuanto mejor es: una delegación llega a la mitad del voto de la provincia,
+// una sede a casi todo y una gran sede a todo.
+const FACTOR_SEDE = [0, 0.5, 0.8, 1];
+const NOMBRES_SEDE = ['Sin sede', 'Delegación', 'Sede', 'Gran sede'];
+const esProvincial = s => !!s && s.modo === 'carrera' && !!s.carrera && !!s.carrera.provincial;
+const numSedes = s => Object.keys((s.carrera && s.carrera.sedes) || {}).length;
+
+// Qué parte del voto del país tienes a tu alcance, de 0 a 1.
+function alcance(s) {
+  if (!esProvincial(s)) return 1;
+  const provs = provinciasJugador(), total = provs.reduce((a, p) => a + p.pob, 0) || 1;
+  return provs.reduce((a, p) => a + p.pob * FACTOR_SEDE[s.carrera.sedes[p.id] || 0], 0) / total;
+}
+
+// El partido nace en la provincia que elijas, con una sede ya montada.
+function fundarPartido(s, provId) {
+  if (!s.fundar || !esProvincial(s)) return;
+  const p = provinciasJugador().find(x => x.id === provId);
+  if (!p) return;
+  s.carrera.sedes = { [provId]: 2 };
+  s.carrera.cuna = provId;
+  s.fundar = null;
+  s.historial = [puntoHistorial(s)];
+  noticia(s, `${s.config.partido} nace en ${p.nombre}, sin un solo diputado.`);
+}
+
+// Lo que cuesta abrir una delegación en una provincia nueva o mejorar la que ya hay.
+function costeSede(s, provId) {
+  const n = s.carrera.sedes[provId] || 0;
+  return n === 0 ? { fondos: 40 + 15 * numSedes(s), cp: 2 } : { fondos: n === 1 ? 60 : 100, cp: 1 };
+}
+
+function puedeSede(s, provId) {
+  if (!esProvincial(s) || s.fundar || !provinciasJugador().some(p => p.id === provId)) return { ok: false };
+  const coste = costeSede(s, provId);
+  if ((s.carrera.sedes[provId] || 0) >= 3) return { ok: false, motivo: 'Ya es una gran sede' };
+  if (s.cp < coste.cp) return { ok: false, motivo: 'Sin capital político' };
+  if (s.carrera.fondos < coste.fondos) return { ok: false, motivo: 'Faltan fondos' };
+  return { ok: true };
+}
+
+function ponerSede(s, provId) {
+  if (!puedeSede(s, provId).ok) return;
+  const c = s.carrera, coste = costeSede(s, provId), n = c.sedes[provId] || 0, nombre = PROV_POR_ID[provId].nombre;
+  s.cp -= coste.cp;
+  c.fondos -= coste.fondos;
+  c.sedes[provId] = n + 1;
+  noticia(s, n ? `${s.config.partido} amplía su sede de ${nombre}.` : `${s.config.partido} abre una delegación en ${nombre}.`, 'bien');
+  comprobarFin(s);
+}
+
 function iniciarCarrera(s) {
-  const dif = dificultad(s);
+  const dif = dificultad(s), provincial = s.config.modo === 'provincial';
   s.modo = 'carrera';
-  s.gobiernoIA = ID_JUGADOR === 'ac' ? 'fo' : 'ac';
-  s.modelo = modeloDePartido(s.gobiernoIA);
   s.carrera = {
-    cargo: 'diputado', prestigio: 5, interno: dif.interno, fondos: 60, apoyoLider: dif.apoyoLider,
-    imagen: {}, promesas: [], hechas: {}, propias: {}, congresoMes: MES_CONGRESO, intentos: 0, mesLider: -1,
-    fuerzaGobierno: dif.fuerzaGobierno,
+    cargo: provincial ? 'lider' : 'diputado', prestigio: 5, interno: provincial ? 70 : dif.interno, fondos: 60, apoyoLider: dif.apoyoLider,
+    imagen: {}, promesas: [], hechas: {}, propias: {}, congresoMes: provincial ? null : MES_CONGRESO, intentos: 0, mesLider: -1,
+    fuerzaGobierno: dif.fuerzaGobierno, provincial, sedes: {}, cuna: null,
   };
   for (const g in GRUPOS) { s.carrera.imagen[g] = 0; s.grupos[g] = dif.apoyoOposicion; }
+  // Gobierna el partido de la máquina con más votos, con los socios que le hagan falta.
+  const bloque = bloqueRival(s, estimarVotos(s, false));
+  s.gobiernoIA = bloque.lider;
+  s.sociosIA = bloque.socios;
+  s.modelo = modeloDePartido(s.gobiernoIA);
+  if (provincial) {
+    // Falta elegir dónde nace el partido. Las primeras elecciones llegan pronto, para estrenarse.
+    s.fundar = true;
+    s.proximaEleccion = Math.min(12, MESES_LEGISLATURA);
+  }
   s.escanos = estimarVotos(s, false);
   s.historial = [puntoHistorial(s)];
-  noticia(s, `${s.config.lider} recoge su acta de diputado por ${s.config.partido}.`);
+  if (!provincial) noticia(s, `${s.config.lider} recoge su acta de diputado por ${s.config.partido}.`);
 }
 
 // La imagen es lo que cada grupo piensa de tu partido por tus posturas. Sube el apoyo al
@@ -51,6 +113,7 @@ function aplicarEfectosCarrera(s, ef) {
 
 function puedeAccionCarrera(s, id) {
   const a = ACCION_CARRERA_POR_ID[id], c = s.carrera;
+  if (id === 'pleno' && !(s.escanos[ID_JUGADOR] > 0)) return { ok: false, motivo: 'Necesitas al menos un escaño' };
   if (c.hechas[id] === s.mes) return { ok: false, motivo: 'Ya lo has hecho este mes' };
   if (s.cp < a.cp) return { ok: false, motivo: 'Sin capital político' };
   if (a.fondos && c.fondos < a.fondos) return { ok: false, motivo: 'Faltan fondos' };
@@ -173,6 +236,14 @@ function posturasGobierno(s) {
     return o;
   };
   const linea = lineaPartido(s);
+  if (!(s.escanos[ID_JUGADOR] > 0)) {
+    // Sin diputados no hay voto que emitir, pero sí una opinión que dar.
+    return [
+      { id: 'no', voto: 'abs', texto: 'Criticar la ley en la calle', efectos: { imagen: imagen(-1, 2), relPartidoDe: { [gob]: -4 } } },
+      { id: 'si', voto: 'abs', texto: 'Apoyar la ley en público', efectos: { imagen: imagen(2, -3), relPartidoDe: { [gob]: 8 } } },
+      { id: 'abs', voto: 'abs', texto: 'No pronunciarse', efectos: {} },
+    ];
+  }
   if (esLider(s)) {
     // Votar contra lo que piensa tu propio partido tiene un precio dentro de él.
     return [
@@ -233,29 +304,63 @@ function celebrarCongreso(s) {
 
 // ---------- Elecciones desde la oposición ----------
 
+// Gobiernas si sacas mayoría absoluta o si la reúnes con socios (ver js/pactos.js). Si diriges el
+// partido y hay números para intentarlo, la investidura la negocias tú.
 function eleccionesCarrera(s) {
-  const c = s.carrera, antes = { ...s.escanos }, escanos = estimarVotos(s, true), gana = ganaJugador(escanos);
-  s.escanos = escanos;
-  s.propuesta = null;
-  s.elecciones = { antes, escanos, gana, carrera: true };
+  const antes = { ...s.escanos }, escanos = estimarVotos(s, true), mios = escanos[ID_JUGADOR], P = s.config.partido;
+  Object.assign(s, { escanos, propuesta: null, pactos: {}, minoria: false });
+  s.elecciones = { antes, escanos, gana: false, carrera: true };
+  let gana = false;
+  if (!usaPactos(s)) gana = ganaJugador(escanos);
+  else if (mios >= MAYORIA) gana = true;
+  else if (esLider(s)) {
+    if (hayCaminoAlGobierno(s)) {
+      s.elecciones.gana = null;
+      s.elecciones.investidura = true;
+      abrirInvestidura(s);
+      s.investidura.antes = antes[ID_JUGADOR];
+      noticia(s, `${P} saca ${mios} escaños. Nadie tiene mayoría absoluta: toca negociar la investidura.`);
+      return;
+    }
+  } else {
+    // Si no diriges el partido, los pactos los cierra la dirección.
+    autoPactar(s, true);
+    const r = pronosticoInvestidura(s);
+    gana = r.gobiernas;
+    s.minoria = r.minoria;
+    if (!gana) s.pactos = {};
+  }
+  s.elecciones.gana = gana;
   if (gana) {
     if (s.directiva) cumplirDirectiva(s);
-    noticia(s, `${s.config.partido} gana las elecciones con ${escanos[ID_JUGADOR]} escaños.`, 'bien');
+    noticia(s, mios >= MAYORIA ? `${P} gana las elecciones con mayoría absoluta: ${mios} escaños.` : `${P} gana las elecciones con ${mios} escaños.`, 'bien');
     return;
   }
-  noticia(s, `${s.config.partido} pierde las elecciones con ${escanos[ID_JUGADOR]} escaños.`, 'mal');
-  if (juzgarDirectivaElecciones(s, escanos)) return;
-  // El partido perdona mejor una derrota en la que se ganan escaños.
-  c.interno = limitar(c.interno - (escanos[ID_JUGADOR] > antes[ID_JUGADOR] ? 8 : 20));
-  if (esLider(s) && c.interno < 35) { perderLiderazgo(s); s.elecciones.destituido = true; }
-  const rivales = Object.keys(escanos).filter(pid => pid !== ID_JUGADOR);
-  s.gobiernoIA = rivales.reduce((a, b) => (escanos[b] > escanos[a] ? b : a));
+  if (mios > antes[ID_JUGADOR]) noticia(s, `${P} sube a ${mios} escaños y sigue en la oposición.`);
+  else noticia(s, `${P} pierde las elecciones con ${mios} escaños.`, 'mal');
+  if (derrotaCarrera(s, bloqueRival(s), antes[ID_JUGADOR])) s.elecciones.destituido = true;
+}
+
+// Gobierna otro bloque: sigues en la oposición una legislatura más. bloque: quién gobierna y con
+// qué socios. antes: los escaños que tenías. Devuelve true si el partido te quita el liderazgo.
+function derrotaCarrera(s, bloque, antes) {
+  const c = s.carrera;
+  if (juzgarDirectivaElecciones(s, s.escanos)) return false;
+  let destituido = false;
+  if (!esProvincial(s)) {
+    // El partido perdona mejor una derrota en la que se ganan escaños.
+    c.interno = limitar(c.interno - (s.escanos[ID_JUGADOR] > antes ? 8 : 20));
+    if (esLider(s) && c.interno < 35) { perderLiderazgo(s); destituido = true; }
+  }
+  s.gobiernoIA = bloque.lider;
+  s.sociosIA = bloque.socios;
   s.modelo = modeloDePartido(s.gobiernoIA);
   c.fuerzaGobierno = dificultad(s).fuerzaGobierno - 0.1;
   c.promesas = [];
   s.legislatura++;
   s.inicioLegislatura = s.mes;
   s.proximaEleccion += MESES_LEGISLATURA;
+  return destituido;
 }
 
 // Has ganado: se acaba la carrera y empieza el gobierno. Heredas las leyes en vigor y tus promesas.
@@ -263,6 +368,10 @@ function formarGobierno(s) {
   const c = s.carrera;
   s.modo = 'gobierno';
   s.gobiernoIA = null;
+  s.sociosIA = [];
+  s.censuraMes = 0;
+  // Quien llega al gobierno ya es un partido de todo el país.
+  c.provincial = false;
   s.elecciones = null;
   s.mesGobierno = s.inicioLegislatura = s.mes;
   s.proximaEleccion = s.mes + MESES_LEGISLATURA;
@@ -286,6 +395,17 @@ function formarGobierno(s) {
 function titularCarrera(s) {
   const c = s.carrera, L = s.config.lider, P = s.config.partido, gob = PARTIDOS[s.gobiernoIA].nombre;
   const faltan = s.proximaEleccion - s.mes, enc = estimarVotos(s, false);
+  if (esProvincial(s)) {
+    const cuna = c.cuna && PROV_POR_ID[c.cuna] ? PROV_POR_ID[c.cuna].nombre : 'su provincia';
+    if (s.mes === 0) return [`Nace ${P}`, 'Un partido nuevo echa a andar en una sola provincia y sin un solo diputado.'];
+    if (!(s.escanos[ID_JUGADOR] > 0) && !ganaJugador(enc)) {
+      return [
+        [`${P} busca su primer escaño`, `Las encuestas le dan ${enc[ID_JUGADOR]} de los ${ESCANOS} escaños en las próximas elecciones.`],
+        [`Un partido de ${cuna} quiere dar el salto`, `${P} tiene sede en ${numSedes(s)} de las ${provinciasJugador().length} provincias.`],
+        [`${L} recorre el país`, 'Sin diputados todavía, su partido se da a conocer plaza a plaza.'],
+      ][s.mes % 3];
+    }
+  }
   if (s.mes === 0) return [`${L} estrena escaño`, `El nuevo diputado de ${P} llega al Parlamento con ganas de hacerse oír.`];
   if (c.mesLider === s.mes) return [`${L}, al frente de ${P}`, `El congreso del partido aparta a ${LIDER_INICIAL} y apuesta por el relevo.`];
   if (s.ultimaLey && s.ultimaLey.mes === s.mes) {
@@ -311,7 +431,11 @@ function consejoCarrera(s) {
     if (quedan <= 4 && apoyoCongreso(s) <= c.apoyoLider) return { texto: `El congreso es en ${quedan} ${quedan === 1 ? 'mes' : 'meses'} y ${LIDER_INICIAL} aún te supera. Reúnete con militantes y barones.`, tab: 'carrera' };
     if (c.interno < APOYO_PARA_RESPALDO) return { texto: `Con menos de ${APOYO_PARA_RESPALDO} de apoyo, tu partido no respaldará las leyes que presentes.`, tab: 'partido' };
   } else {
-    if (c.interno < 35) return { texto: 'El partido está inquieto. Si su apoyo baja de 25, te quitarán el liderazgo.', tab: 'partido' };
+    if (esProvincial(s)) {
+      const n = numSedes(s), total = provinciasJugador().length;
+      if (n < total) return { texto: `Solo recoges votos donde tienes sede, y tienes ${n} de ${total} provincias. Abre delegaciones en Partido.`, tab: 'partido' };
+      if (alcance(s) < 1) return { texto: 'Tus delegaciones se quedan cortas. Amplíalas para llegar a todos los votantes.', tab: 'partido' };
+    } else if (c.interno < 35) return { texto: 'El partido está inquieto. Si su apoyo baja de 25, te quitarán el liderazgo.', tab: 'partido' };
     if (c.promesas.length < MAX_PROMESAS) return { texto: 'Tu programa electoral tiene huecos. Cada promesa atrae a los grupos a los que beneficia.', tab: 'partido' };
     if (faltan <= 6 && !ganaJugador(estimarVotos(s, false))) return { texto: 'Aún no vas primero en las encuestas. Da mítines y haz campaña.', tab: 'sociedad' };
   }
@@ -326,15 +450,16 @@ function consejoCarrera(s) {
 function mesCarreraAntes(s) {
   const c = s.carrera;
   s.cp = Math.min(CP_MAXIMO, s.cp + 2);
-  c.fondos += 5;
+  // Cada sede trae cuotas de afiliados.
+  c.fondos += 5 + (esProvincial(s) ? 2 * numSedes(s) : 0);
   c.prestigio -= olvidoPrestigio(s);
   for (const g in GRUPOS) s.grupos[g] = Math.round(s.grupos[g] + (objetivoGrupoCarrera(s, g).valor - s.grupos[g]) * 0.25);
   c.fuerzaGobierno = Math.max(1.1, +(c.fuerzaGobierno - 0.012).toFixed(3));
-  if (esLider(s)) {
+  if (esLider(s) && !esProvincial(s)) {
     // El partido juzga a su líder por las encuestas.
     const enc = estimarVotos(s, false)[ID_JUGADOR];
     if (enc < s.escanos[ID_JUGADOR]) c.interno = limitar(c.interno - 1);
-    else if (enc > s.escanos[ID_JUGADOR] + 3) c.interno = limitar(c.interno + 1);
+    else if (enc > s.escanos[ID_JUGADOR] + 10) c.interno = limitar(c.interno + 1);
   }
   s.mes++;
 }

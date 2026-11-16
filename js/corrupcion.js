@@ -11,7 +11,7 @@
 function ponerDirectiva(s, tipo) {
   const c = s.carrera;
   if (tipo === 'escanos') {
-    const min = Math.max(8, Math.round((s.escanos[ID_JUGADOR] || 15) * 0.9));
+    const min = Math.max(25, Math.round((s.escanos[ID_JUGADOR] || 50) * 0.9));
     s.directiva = { tipo, min, plazo: s.proximaEleccion };
   } else {
     s.directiva = { tipo, min: Math.min(75, Math.max(50, c.interno + 15)), plazo: s.mes + 12 };
@@ -69,6 +69,8 @@ const MOTIVOS_CAIDA = {
   bancarrota: ['Bancarrota', 'La deuda es impagable y tu gobierno dimite.'],
   destituido: ['Te quitan el liderazgo', 'El partido elige a otra persona para dirigirlo.'],
   congreso: ['Pierdes otra vez el congreso', 'Sigues como diputado, pero el partido quiere verte trabajar.'],
+  investidura: ['No logras formar gobierno', 'Otro bloque reúne más escaños que el tuyo.'],
+  censura: ['Moción de censura', 'La oposición reúne mayoría absoluta y tumba a tu gobierno.'],
 };
 
 // Dejas de gobernar: pasas a liderar tu partido en la oposición, como en la carrera.
@@ -87,19 +89,22 @@ function caerDelGobierno(s, motivo) {
     firmarPaz(s, pid, 'blanca');
     if (s.guerras[pid]) firmarPaz(s, pid, 'ceder');
   }
-  const rivales = Object.keys(s.escanos).filter(pid => pid !== ID_JUGADOR);
+  // Gobierna el partido rival con más escaños, con los socios afines que necesite.
+  Object.assign(s, { pactos: {}, minoria: false, investidura: null, censuraMes: 0 });
+  const bloque = bloqueRival(s);
   s.modo = 'carrera';
-  s.gobiernoIA = rivales.reduce((a, b) => (s.escanos[b] > s.escanos[a] ? b : a));
+  s.gobiernoIA = bloque.lider;
+  s.sociosIA = bloque.socios;
   s.modelo = modeloDePartido(s.gobiernoIA);
   s.carrera = {
     cargo: 'lider', prestigio: 30, interno: 50, fondos: 80, apoyoLider: dif.apoyoLider,
     imagen: {}, promesas: [], hechas: {}, propias: {}, congresoMes: null, intentos: 0, mesLider: -1,
-    fuerzaGobierno: dif.fuerzaGobierno,
+    fuerzaGobierno: dif.fuerzaGobierno, provincial: false, sedes: {}, cuna: null,
   };
   for (const g in GRUPOS) { s.carrera.imagen[g] = 0; s.grupos[g] = Math.min(s.grupos[g], dif.apoyoOposicion + 5); }
   for (const id in CARTERAS) s.ministros[id] = null;
   Object.assign(s, { propuesta: null, votacion: null, promesas: [], obras: [], pleno: null });
-  if (motivo !== 'elecciones') {
+  if (motivo !== 'elecciones' && motivo !== 'investidura') {
     // Tras una dimisión hay elecciones en un año.
     s.proximaEleccion = s.mes + Math.min(12, MESES_LEGISLATURA);
   }
