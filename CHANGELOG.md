@@ -4,6 +4,34 @@ Todas las novedades del juego, de la más reciente a la más antigua.
 
 ---
 
+## 🎓 Versión 2.3 — *«De la mano»* (16/11/2026)
+
+### ✨ Novedades
+
+- 🧭 **Tutoriales nuevos, mucho más guiados**: ahora el tutorial **te lleva solo a cada pestaña** y te explica qué estás viendo antes de pedirte que lo pruebes.
+- 👆 **Un puntero señala dónde pulsar** y una casilla te dice la **tarea** de cada paso: nada de buscar el botón.
+- 🖼️ **Tarjeta más visual**: cada paso tiene su icono y un dibujo (tus escaños frente a la mayoría, la cadena granja → fábrica → dinero, el apoyo de cada grupo…).
+- ⭐ **El capital político, por fin explicado**: cuánto tienes, cuánto recuperas al mes y **lo que cuesta cada decisión**.
+- 📚 **Capítulos**: la barra de arriba muestra en qué parte vas (primeros pasos, tu país, leyes y pactos, tu gobierno, tus votantes, el mundo).
+- 🤝 **Todo lo nuevo, dentro del tutorial**:
+  - Los **pactos de gobierno**: cierras uno de verdad y ves qué es gobernar en mayoría o en minoría.
+  - La **investidura**, en el tutorial completo: negocias con los partidos hasta sumar más que tu rival.
+  - **Monarquía o república** y el referéndum.
+  - Los **mítines**, la política de **los demás países**, el diseño de la **insignia**, las costumbres y los tres modos de juego.
+
+### 🔧 Cambios
+
+- ↩️ Botón **Atrás** para releer la explicación anterior, y **«Llévame allí»** si te has ido a otra pestaña.
+- 🎯 En la partida de práctica empiezas **sin mayoría absoluta**, para que pactar tenga sentido.
+- 🗳️ En los tutoriales ya no gobierna «el más votado»: funcionan los pactos, como en una partida normal.
+- 🌐 Todo el tutorial nuevo está **traducido** a inglés, alemán, francés y portugués.
+
+### 🐛 Correcciones
+
+- 🔤 Dos explicaciones del tutorial completo se quedaban en español al jugar en otro idioma.
+
+---
+
 ## 🎨 Versión 2.2 — *«Tu partido, tu sello»* (16/11/2026)
 
 ### ✨ Novedades

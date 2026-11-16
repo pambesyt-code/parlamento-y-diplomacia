@@ -914,3 +914,82 @@ body.con-tutorial main { padding-bottom: calc(var(--alto-tut, 200px) + 32px); }
 .pais-eu:active { transform: scale(.96); }
 .pais-eu.activa { background: var(--sobre-sala); color: #1b221e; border-color: var(--sobre-sala); }
 .opciones-fila .muestra:not(.emblema):not(.activa) { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2); }
+
+/* ---------- Tutorial, versión visual (2.3) ---------- */
+#tutorial { width: min(430px, calc(100vw - 32px)); max-height: calc(100vh - var(--alto-cab, 0px) - 24px); overflow-y: auto; scrollbar-width: thin; }
+#tutorial.sobre-modal { z-index: 12; }
+#tutorial.logro { animation: tut-logro .7s ease-out; }
+@keyframes tut-logro { 0% { box-shadow: 0 0 0 1.5px var(--laton), 0 0 0 0 rgba(243, 210, 122, .7); } 100% { box-shadow: 0 0 0 1.5px var(--laton), 0 0 0 18px rgba(243, 210, 122, 0); } }
+.tut-cab .tut-cap { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tut-cab .tut-n { color: var(--sobre-sala-2); font-weight: 600; }
+.tut-tramos { display: flex; gap: 3px; margin: 8px 0 12px; }
+.tut-tramos span { height: 5px; min-width: 6px; border-radius: 3px; background: rgba(240, 233, 212, .14); overflow: hidden; }
+.tut-tramos i { display: block; height: 100%; border-radius: 3px; background: var(--laton); transition: width .4s ease-out; }
+.tut-tit { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.tut-tit h3 { margin: 0 !important; text-wrap: balance; }
+.tut-medalla { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(243, 210, 122, .14); color: var(--laton-2); box-shadow: inset 0 0 0 1px rgba(243, 210, 122, .35); }
+.tut-medalla .ico { width: 21px; height: 21px; }
+#tutorial p { text-wrap: pretty; }
+.tut-tarea { display: flex; align-items: center; gap: 9px; margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(243, 210, 122, .1); box-shadow: inset 0 0 0 1px rgba(243, 210, 122, .3); font-size: 14px; font-weight: 700; color: var(--laton-2); }
+.tut-tarea i { flex: none; width: 16px; height: 16px; border-radius: 5px; border: 2px solid var(--laton-2); animation: tut-pulso 1.4s ease-in-out infinite; }
+@keyframes tut-pulso { 50% { box-shadow: 0 0 0 4px rgba(243, 210, 122, .22); } }
+
+/* Dibujos dentro de la tarjeta */
+.tv { margin-top: 10px; padding: 9px; border-radius: 10px; background: rgba(0, 0, 0, .2); font-size: 12.5px; color: #d7dccf; }
+.tv-fila, .tv-cadena, .tv-estado { display: flex; align-items: stretch; gap: 6px; }
+.tv-celda { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 4px; border-radius: 8px; background: rgba(240, 233, 212, .06); text-align: center; }
+.tv-celda .ico { width: 20px; height: 20px; color: var(--laton-2); }
+.tv-celda b { font-size: 12.5px; color: var(--sobre-sala); line-height: 1.2; }
+.tv-celda small { font-size: 11px; line-height: 1.2; opacity: .8; }
+.tv-celda.activa { background: rgba(243, 210, 122, .16); box-shadow: inset 0 0 0 1.5px var(--laton-2); }
+.tv-celda.hecha { opacity: .55; }
+.tv-flecha { display: grid; place-items: center; flex: none; color: var(--sobre-sala-2); }
+.tv-flecha .ico { width: 14px; height: 14px; }
+.tv-nota { margin: 6px 0 0 !important; font-size: 12px !important; text-align: center; font-variant-numeric: tabular-nums; color: var(--sobre-sala-2) !important; }
+.tv-puntos { display: flex; justify-content: center; gap: 5px; }
+.tv-puntos i { width: 17px; height: 17px; border-radius: 50%; border: 2px solid rgba(243, 210, 122, .45); }
+.tv-puntos i.lleno { background: var(--laton-2); border-color: var(--laton-2); box-shadow: 0 0 8px rgba(243, 210, 122, .45); }
+.tv-costes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.tv-costes span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 99px; background: rgba(240, 233, 212, .08); font-size: 12px; }
+.tv-costes b { display: inline-flex; align-items: center; gap: 2px; color: var(--laton-2); font-variant-numeric: tabular-nums; }
+.tv-costes .ico { width: 12px; height: 12px; }
+.tv-barra { position: relative; display: flex; height: 16px; border-radius: 5px; overflow: visible; }
+.tv-barra i { min-width: 2px; }
+.tv-barra i:first-child { border-radius: 5px 0 0 5px; }
+.tv-barra i:last-of-type { border-radius: 0 5px 5px 0; }
+.tv-barra em { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .5); }
+.tv-estado { align-items: center; }
+.tv-estado .referendum-barra { flex: 1.2; }
+.tv-estado .tv-celda { flex: 1; }
+.tv-grupos { display: grid; gap: 5px; }
+.tv-grupos > div { display: grid; grid-template-columns: 112px 1fr 26px; align-items: center; gap: 8px; }
+.tv-grupos span { display: inline-flex; align-items: center; gap: 6px; }
+.tv-grupos .ico { width: 15px; height: 15px; color: var(--laton-2); }
+.tv-grupos b { text-align: right; font-variant-numeric: tabular-nums; color: var(--sobre-sala); }
+.tv-medidor { height: 7px; border-radius: 4px; background: rgba(240, 233, 212, .14); overflow: hidden; }
+.tv-medidor i { display: block; height: 100%; border-radius: 4px; background: var(--laton-2); }
+.tv-bienvenida { display: flex; align-items: center; gap: 12px; }
+.tv-bienvenida .bandera { width: 42px; height: 28px; border-radius: 3px; flex: none; }
+.tv-bienvenida b { display: block; font-size: 15px; color: var(--sobre-sala); }
+.tv-bienvenida small { font-size: 12.5px; opacity: .8; }
+
+/* El puntero que señala dónde pulsar */
+#tut-dedo { position: fixed; z-index: 9; width: 36px; height: 36px; margin-left: -18px; display: grid; place-items: center; border-radius: 50%; background: var(--laton-2); color: #1b221e; box-shadow: 0 4px 14px rgba(0, 0, 0, .45); pointer-events: none; animation: tut-dedo 1s ease-in-out infinite; }
+#tut-dedo[hidden] { display: none; }
+#tut-dedo .ico { width: 20px; height: 20px; stroke-width: 2.6; }
+#tut-dedo.desde-arriba .ico { transform: rotate(180deg); }
+#tut-dedo.desde-arriba { animation-name: tut-dedo-b; }
+#tut-dedo.sobre-modal { z-index: 13; }
+@keyframes tut-dedo { 50% { transform: translateY(7px); } }
+@keyframes tut-dedo-b { 50% { transform: translateY(-7px); } }
+/* Con la tarjeta del tutorial por encima de una ventana, la ventana se coloca sobre ella en vez de debajo. */
+body.tut-modal #modal { align-items: start; padding-bottom: calc(var(--alto-tut, 220px) + 28px); }
+body.tut-modal #modal .ventana { max-height: calc(100vh - var(--alto-tut, 220px) - 48px); }
+body.tut-modal #avisos { display: none; }
+@media (prefers-reduced-motion: reduce) { #tut-dedo, .tut-tarea i { animation: none; } }
+@media (max-width: 640px) {
+  .tv-grupos > div { grid-template-columns: 96px 1fr 24px; }
+  .tv-celda small { display: none; }
+  .tut-medalla { width: 32px; height: 32px; border-radius: 10px; }
+}
+@media (max-width: 640px) { #tutorial { max-height: 58vh; } }
