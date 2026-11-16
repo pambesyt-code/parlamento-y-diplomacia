@@ -132,7 +132,7 @@ function htmlPartidoPropio(c) {
   return `
     <div class="vista-partido">${logoPartido(c, 'grande')}
       <div><b id="vp-partido">${esc(c.partido)}</b><span id="vp-lider">Lo lidera ${esc(c.lider)}</span></div></div>
-    <label class="campo"><span>Nombre del partido</span><input id="cfg-partido" maxlength="28" value="${esc(c.partido)}" autocomplete="off"></label>
+    <label class="campo"><span>Nombre del partido</span><input id="cfg-partido" maxlength="40" value="${esc(c.partido)}" autocomplete="off"></label>
     <div class="campo"><span>Color</span><div class="opciones-fila">
       ${COLORES_PARTIDO.map(col => `<button class="muestra ${col === c.color ? 'activa' : ''}" data-a="cfg" data-k="color" data-v="${col}" style="background:${col}" aria-label="Color ${col}" aria-pressed="${col === c.color}"></button>`).join('')}
       <label class="muestra libre ${COLORES_PARTIDO.includes(c.color) ? '' : 'activa'}" title="Cualquier color" style="background:${COLORES_PARTIDO.includes(c.color) ? 'conic-gradient(#e44,#ee4,#4e4,#4ee,#44e,#e4e,#e44)' : c.color}">

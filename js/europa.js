@@ -152,11 +152,13 @@ function paisesEuropa() {
 }
 
 // Crea Europa y rellena NACIONES. elegido: el país que lleva el jugador.
-function mundoEuropa(elegido) {
+// libre: el mundo del multijugador, donde ningún país está reservado y cada jugador elige el suyo.
+function mundoEuropa(elegido, libre) {
   const E = EUROPA;
-  if (!E.paises[elegido]) elegido = EUROPA_POR_DEFECTO;
+  if (libre) elegido = null;
+  else if (!E.paises[elegido]) elegido = EUROPA_POR_DEFECTO;
   // Cada país elegido da una Europa con otros gobiernos y otras rivalidades.
-  const rng = crearAzar([...elegido].reduce((a, ch) => a * 31 + ch.charCodeAt(0), 1957));
+  const rng = crearAzar([...(elegido || 'libre')].reduce((a, ch) => a * 31 + ch.charCodeAt(0), 1957));
   const idDe = cod => (cod === elegido ? idHumano(0) : 'e' + cod);
   const provs = [];
   for (const cod in E.paises) E.paises[cod].provs.forEach(([lon, lat, nombre], i) => {
@@ -187,20 +189,24 @@ function mundoEuropa(elegido) {
     usos[color]++;
     const car = CARACTERES[Math.floor(rng() * CARACTERES.length)];
     NACIONES[pid] = {
-      nombre: P.nombre, estilo: P.estilo, color, bandera: P.bandera, gobierno: car.gobierno, desc: car.desc,
+      nombre: P.nombre, estilo: P.estilo, color, bandera: P.bandera, banderaFija: P.bandera, gobierno: car.gobierno, desc: car.desc,
       relacion: car.relacion + entre(rng, -8, 8), comercio: Math.round(car.comercio * (0.6 + 0.15 * Math.min(n, 8))),
       ejercito: Math.max(2, Math.round(n * car.fuerza + rng() * 1.5)), provincias: n, rival: null, capitalProv: capital,
     };
   }
-  ponerRivales(rng, provs, geo, [idHumano(0)]);
-  return { rng, provs, geo, libre: false };
+  ponerRivales(rng, provs, geo, libre ? [] : [idHumano(0)]);
+  return { rng, provs, geo, libre: !!libre };
 }
 
 // En Europa hay países de una, dos o tres provincias, y los gastos del Estado no entienden de tamaños.
 // Para que se puedan jugar, el del jugador concentra en ellas más gente, tierra buena y solares.
-function compensarPaisPequeno(provs) {
-  const mias = provs.filter(p => NACIONES[p.pais].humano), n = mias.length;
-  if (n > 4) return;
+// En el multijugador (libre) cualquier país puede acabar en manos de un jugador: se compensan todos.
+function compensarPaisPequeno(provs, libre) {
+  for (const pid in NACIONES) if (libre || NACIONES[pid].humano) compensarUno(provs.filter(p => p.pais === pid));
+}
+function compensarUno(mias) {
+  const n = mias.length;
+  if (!n || n > 4) return;
   const gente = [0, 2.6, 1.8, 1.45, 1.2][n];
   for (const p of mias) p.pob = Math.round(p.pob * gente / 10) * 10;
   if (n > 3) return;

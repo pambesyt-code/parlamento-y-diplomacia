@@ -1389,10 +1389,13 @@ document.addEventListener('input', ev => {
     ui.cfg.letras = limpiarLetras(t.value);
     refrescarInsignia();
   } else if (t.id === 'codigo-sala') ui.codigoSala = t.value.toUpperCase();
+  // En la sala, la palabra secreta cambia el mapa al instante; un número, al terminar de escribirlo.
+  else if (t.id === 'sala-semilla' && esEuropa(t.value) && soyAnfitrion() && RED.sala.config.semilla !== 'EUROPA') { Sonido.tocar('moneda'); cambiarConfigSala('semilla', 'EUROPA'); }
   else if (t.id === 'op-volumen') { opciones.volumen = t.value / 100; aplicarOpciones(); }
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'op-volumen') Sonido.tocar('moneda');
+  if (ev.target.id === 'sala-semilla' && soyAnfitrion() && !esEuropa(ev.target.value) && parseInt(ev.target.value.replace(/\D/g, ''), 10)) cambiarConfigSala('semilla', ev.target.value);
   if (COLORES_VIVOS[ev.target.id]) { ui.cfg[COLORES_VIVOS[ev.target.id]] = ev.target.value; if (ui.pantalla === 'sala') enviarPerfil(); render(); }
   if (ev.target.id === 'cfg-letras') { ui.cfg.letras = limpiarLetras(ev.target.value); if (ui.pantalla === 'sala') enviarPerfil(); render(); }
   // En la sala, el nombre del jugador, del partido y del país se mandan al terminar de escribirlos.

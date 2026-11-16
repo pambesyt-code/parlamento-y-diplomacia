@@ -500,8 +500,8 @@ function generarMundo(semilla, tamano, humanos = 1, elegido) {
   const T = TAMANOS[tamano] || TAMANOS.mediano;
   const libre = humanos === 0;
   const propias = humanos > 1 ? T.propias - 2 : T.propias;
-  const europa = humanos === 1 && typeof esEuropa === 'function' && esEuropa(semilla);
-  let mundo = europa ? mundoEuropa(elegido) : null;
+  const europa = humanos <= 1 && typeof esEuropa === 'function' && esEuropa(semilla);
+  let mundo = europa ? mundoEuropa(elegido, libre) : null;
   for (let intento = 0; intento < 24 && !mundo; intento++) {
     const estricto = intento < 20;
     const rng = crearAzar((semilla >>> 0) + intento * 7919);
@@ -521,7 +521,7 @@ function generarMundo(semilla, tamano, humanos = 1, elegido) {
   }
   if (!europa) crearPaises(mundo.rng, mundo.provs, mundo.geo, mundo.reparto);
   darAtributos(mundo.rng, mundo.provs, mundo.geo, mundo.libre);
-  if (europa) compensarPaisPequeno(mundo.provs);
+  if (europa) compensarPaisPequeno(mundo.provs, libre);
   PROVINCIAS = mundo.provs;
   PROV_POR_ID = Object.fromEntries(PROVINCIAS.map(p => [p.id, p]));
   GEO = mundo.geo;

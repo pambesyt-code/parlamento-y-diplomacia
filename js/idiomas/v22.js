@@ -26,6 +26,8 @@ registrarTextos([
   ["Aro", "Ring", "Ring", "Anneau", "Aro"],
 
   // Mapa de Europa
+  ["En Europa caben {} jugadores", "Europe holds {} players", "In Europa haben {} Spieler Platz", "L'Europe accueille {} joueurs", "Na Europa cabem {} jogadores"],
+  ["Europa", "Europe", "Europa", "Europe", "Europa"],
   ["Tu país en Europa", "Your country in Europe", "Dein Land in Europa", "Votre pays en Europe", "Seu país na Europa"],
   ["Has encontrado el mapa secreto. El número de cada país son sus provincias: con muy pocas, la partida es mucho más difícil.",
     "You have found the secret map. The number beside each country is its provinces: with very few, the game is much harder.",

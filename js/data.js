@@ -526,7 +526,7 @@ const FORMAS_INSIGNIA = { circulo: 'Círculo', cuadrado: 'Cuadrado', escudo: 'Es
 const FONDOS_INSIGNIA = { liso: 'Liso', mitades: 'Dos mitades', diagonal: 'Diagonal', franja: 'Franja', aro: 'Aro' };
 const COLORES_SIMBOLO = ['#ffffff', '#f3d27a', '#1b221e'];
 const COLORES_SEGUNDO = ['#ffffff', '#1b221e', '#f3d27a', '#b3261e', '#2f5d9a', '#2c6e49'];
-const MAX_LETRAS_EMBLEMA = 3;
+const MAX_LETRAS_EMBLEMA = 4;
 const ES_COLOR = /^#[0-9a-f]{6}$/i;
 const limpiarLetras = t => [...String(t || '').replace(/[^\p{L}\p{N}+·!?-]/gu, '')].slice(0, MAX_LETRAS_EMBLEMA).join('');
 const disenoPartido = c => ({ color: c.color, emblema: c.emblema, insignia: c.insignia, fondo: c.fondo, color2: c.color2, colorSimbolo: c.colorSimbolo, letras: c.letras });

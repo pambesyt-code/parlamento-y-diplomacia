@@ -35,15 +35,17 @@ function configSala(c, anfitrion) {
   if (!anfitrion) {
     const fila = (k, v) => `<div class="fila-sala"><span>${k}</span><b>${v}</b></div>`;
     return `${fila('Cómo se empieza', MODOS_JUEGO[c.modo].nombre)}${fila('Dificultad', DIFICULTADES[c.dificultad].nombre)}
-      ${fila('Mapa', `${TAMANOS[c.tamano].nombre}, número ${c.semilla}`)}${fila('Elecciones', `cada ${c.legislatura} meses`)}
+      ${fila('Mapa', esEuropa(c.semilla) ? 'Europa' : `${TAMANOS[c.tamano].nombre}, número ${c.semilla}`)}${fila('Elecciones', `cada ${c.legislatura} meses`)}
       ${fila('Partidos por país', c.nPartidos || 6)}${fila('Tiempo por mes', plural(c.minutos, 'minuto', 'minutos'))}`;
   }
   const segmento = (k, valores, actual) => `<div class="segmento oscuro">${valores.map(([v, t]) =>
     `<button class="${String(actual) === String(v) ? 'activa' : ''}" data-a="salaCfg" data-k="${k}" data-v="${v}" aria-pressed="${String(actual) === String(v)}">${t}</button>`).join('')}</div>`;
   return `<div class="campo"><span>Cómo empieza cada jugador</span>${botonesSala('modo', MODOS_JUEGO, c.modo, 'dos')}</div>
     <div class="campo"><span>Dificultad</span>${botonesSala('dificultad', DIFICULTADES, c.dificultad)}</div>
-    <div class="campo"><span>Tamaño del mundo</span>${botonesSala('tamano', TAMANOS, c.tamano)}</div>
-    <div class="campo"><span>Mapa número ${c.semilla}</span><button class="btn claro" data-a="otroMapaSala">${ico('mapa')} Generar otro</button></div>
+    ${esEuropa(c.semilla) ? '' : `<div class="campo"><span>Tamaño del mundo</span>${botonesSala('tamano', TAMANOS, c.tamano)}</div>`}
+    <div class="campo"><span>Mapa: cada número da un mundo distinto</span><div class="semilla">
+      <input id="sala-semilla" maxlength="7" value="${c.semilla}" aria-label="Número del mapa" autocomplete="off" autocapitalize="characters" translate="no">
+      <button class="btn claro" data-a="otroMapaSala">${ico('mapa')} Generar otro</button></div></div>
     <div class="campo"><span>Partidos en cada parlamento (más los propios de los jugadores)</span>${segmento('nPartidos', Object.keys(NUM_PARTIDOS).map(n => [n, `${n}`]), c.nPartidos || 6)}</div>
     <div class="campo"><span>Elecciones cada</span>${segmento('legislatura', Object.keys(LEGISLATURAS).map(n => [n, `${n} meses`]), c.legislatura)}</div>
     <div class="campo"><span>Tiempo máximo por mes: si se acaba, el mes pasa aunque falte alguien</span>
@@ -138,7 +140,7 @@ function htmlSalaPerfil() {
     <h2 class="menu-h2">Tu personaje</h2>
     <label class="campo"><span>Tu nombre</span><input id="cfg-lider" maxlength="24" value="${esc(c.lider)}" autocomplete="off"></label>
     ${pasoPartido(c)}
-    ${gobernare ? `<label class="campo"><span>Nombre de tu país</span><input id="cfg-pais" maxlength="18" value="${esc(c.pais)}" autocomplete="off"></label>
+    ${gobernare ? `${esEuropa(RED.sala.config.semilla) ? '' : `<label class="campo"><span>Nombre de tu país</span><input id="cfg-pais" maxlength="18" value="${esc(c.pais)}" autocomplete="off"></label>`}
     <div class="campo"><span>Color de tu país en el mapa</span><div class="opciones-fila">
       ${COLORES_PAIS.map(col => `<button class="muestra ${col === c.colorPais ? 'activa' : ''}" data-a="cfg" data-k="colorPais" data-v="${col}" style="background:${col}" aria-label="Color ${col}" aria-pressed="${col === c.colorPais}"></button>`).join('')}
     </div></div>` : mio ? '<p class="campo-nota">El nombre y el color del país los elige quien lo gobierna.</p>' : ''}

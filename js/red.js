@@ -190,7 +190,9 @@ function alternarPausa() {
 
 function cambiarConfigSala(k, v) {
   const c = RED.sala.config;
-  c[k] = k === 'legislatura' || k === 'minutos' || k === 'semilla' || k === 'nPartidos' ? +v : v;
+  c[k] = k === 'legislatura' || k === 'minutos' || k === 'nPartidos' ? +v : v;
+  // El número del mapa, o la palabra que abre el mapa secreto de Europa.
+  if (k === 'semilla') c.semilla = esEuropa(v) ? 'EUROPA' : (parseInt(String(v).replace(/\D/g, ''), 10) || 1);
   // Con otro mapa los países son otros: cada jugador vuelve a elegir.
   if (k === 'tamano' || k === 'semilla') {
     for (const j of RED.sala.jugadores) j.perfil.nacion = null;
@@ -208,8 +210,8 @@ function jugadoresPorPais(jugadores) {
 
 // Lo que impide empezar, contado para que el anfitrión sepa qué falta.
 function puedeEmpezar(sala = RED.sala) {
-  const max = MAX_JUGADORES[sala.config.tamano];
-  if (sala.jugadores.length > max) return { ok: false, motivo: `En un mundo ${TAMANOS[sala.config.tamano].nombre.toLowerCase()} caben ${max} jugadores` };
+  const europa = esEuropa(sala.config.semilla), max = europa ? MAX_JUGADORES.grande : MAX_JUGADORES[sala.config.tamano];
+  if (sala.jugadores.length > max) return { ok: false, motivo: europa ? `En Europa caben ${max} jugadores` : `En un mundo ${TAMANOS[sala.config.tamano].nombre.toLowerCase()} caben ${max} jugadores` };
   const sinPais = sala.jugadores.find(j => !j.perfil.nacion);
   if (sinPais) return { ok: false, motivo: `${sinPais.perfil.lider} aún no ha elegido país en el mapa` };
   const grupos = jugadoresPorPais(sala.jugadores);
@@ -251,6 +253,8 @@ function empezarPartida() {
     const huecos = grupos[pid].map(j => j.perfil.hueco);
     partidos[pid] = [...elegirPartidos(sala.config.nPartidos, huecos), ...huecos.filter(h => /^j\d/.test(h))];
     const gob = grupos[pid][0];
+    // En Europa cada país se llama como de verdad.
+    if (esEuropa(sala.config.semilla)) for (const j of grupos[pid]) j.perfil.pais = NACIONES[pid].nombre;
     // Un país compartido empieza siempre gobernado: la carrera es para quien juega solo en su país.
     cfgs[pid] = completarConfig({ ...sala.config, ...gob.perfil, nacion: pid, modo: grupos[pid].length > 1 ? 'gobierno' : sala.config.modo });
     registrarHumano(pid, cfgs[pid]);

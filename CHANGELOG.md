@@ -13,13 +13,14 @@ Todas las novedades del juego, de la más reciente a la más antigua.
   - 🌗 **5 fondos con dos colores**: liso, dos mitades, diagonal, franja y aro. Eliges los dos colores que quieras.
   - 🖌️ **Color del símbolo** a tu gusto: blanco, dorado, negro o cualquier otro.
 - ⭐ **61 símbolos** para elegir (antes había 5): corazón, rayo, puño, cohete, átomo, árbol, llama, libro, ojo, tridente, signo de la paz y muchos más.
-- 🔤 **Letras en la insignia**: escribe hasta **3 letras o números** (las siglas de tu partido, por ejemplo) y sustituyen al símbolo.
+- 🔤 **Letras en la insignia**: escribe hasta **4 letras o números** (las siglas de tu partido, por ejemplo) y sustituyen al símbolo.
 - 👀 Tu insignia se ve **en todo el juego**: hemiciclo, encuestas, pactos, mapa electoral y sala de multijugador.
-- 🤫 **Hay un mapa secreto.** Dicen que, si en el número del mapa escribes el nombre de cierto **continente**, el mundo deja de ser inventado…
+- 🤫 **Hay un mapa secreto.** Dicen que, si en el número del mapa escribes el nombre de cierto **continente**, el mundo deja de ser inventado… y que funciona **también con amigos**.
 
 ### 🔧 Cambios
 
-- 🗺️ La casilla del número del mapa ahora también admite letras.
+- 🗺️ La casilla del número del mapa ahora también admite letras, también en la sala de multijugador.
+- ✏️ Los **nombres de partido** pueden ser más largos: hasta **40 caracteres**.
 - 🌐 Todo lo nuevo está **traducido** a inglés, alemán, francés y portugués.
 
 ---

@@ -150,7 +150,7 @@ function logoPartido(info, cls = '') {
   const forma = FORMAS_INSIGNIA[info.insignia] ? info.insignia : 'circulo';
   const letras = limpiarLetras(info.letras);
   const dentro = letras
-    ? `<svg class="ico letras" viewBox="0 0 24 24" aria-hidden="true" translate="no"><text x="12" y="12.500" text-anchor="middle" dominant-baseline="central" font-size="${[0, 19, 14, 10][letras.length]}">${letras}</text></svg>`
+    ? `<svg class="ico letras" viewBox="0 0 24 24" aria-hidden="true" translate="no"><text x="12" y="12.500" text-anchor="middle" dominant-baseline="central" font-size="${[0, 19, 14, 10, 7.8][letras.length]}">${letras}</text></svg>`
     : ico(info.emblema);
   return `<span class="logo f-${forma} ${cls}" style="background:${fondo};color:${tinta}">${dentro}</span>`;
 }
