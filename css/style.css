@@ -993,3 +993,66 @@ body.tut-modal #avisos { display: none; }
   .tut-medalla { width: 32px; height: 32px; border-radius: 10px; }
 }
 @media (max-width: 640px) { #tutorial { max-height: 58vh; } }
+
+/* ---------- Inmersión (2.4): pequeñas cosas en 3D y más movimiento ---------- */
+
+/* Las ventanas entran con un leve giro hacia ti. */
+@keyframes pop { from { opacity: 0; transform: perspective(900px) translateY(18px) rotateX(9deg) scale(.96); } }
+
+/* La fecha cambia como una hoja de calendario. */
+.stat .v.giro { animation: hoja .5s cubic-bezier(.2, .7, .2, 1); transform-origin: 50% 0; }
+@keyframes hoja { from { opacity: 0; transform: perspective(260px) rotateX(-85deg); } }
+
+/* El título del menú, con relieve. */
+.menu-titulo h1 { text-shadow: 0 1px 0 rgba(0, 0, 0, .28), 0 2px 0 rgba(0, 0, 0, .22), 0 3px 0 rgba(0, 0, 0, .16), 0 10px 22px rgba(0, 0, 0, .3); }
+
+/* Botones y tarjetas que se inclinan hacia el puntero (la clase la pone efectos.js). */
+.inclina.inclina, .inclina.inclina:hover { transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(var(--pr, 1)); }
+.inclina.inclina:active { --pr: .97; }
+.vista-partido .logo, .opcion, .pais-eu { transition: transform .15s ease-out; }
+.vista-partido { perspective: 500px; }
+
+/* El dibujo del menú gira un poco siguiendo al ratón. */
+#menu-hero > .hero, #menu-hero > .vista-mundo:not(.mapa-sala) {
+  transform: perspective(1000px) rotateX(var(--hx, 0deg)) rotateY(var(--hy, 0deg)); transform-origin: 50% 60%; transition: transform .3s ease-out;
+}
+
+/* La insignia da la vuelta como una moneda al cambiar de diseño, y en la cabecera al pasar el ratón. */
+.logo.moneda { animation: moneda .52s cubic-bezier(.2, .8, .2, 1); }
+@keyframes moneda { from { transform: perspective(420px) rotateY(180deg) scale(.82); } }
+@media (hover: hover) and (pointer: fine) {
+  #marca .logo { transition: transform .5s cubic-bezier(.2, .8, .2, 1); }
+  #marca:hover .logo { transform: perspective(420px) rotateY(360deg); }
+}
+
+/* Al abrir una pestaña, su icono salta y los escaños del hemiciclo brotan en oleada. */
+.tab.activa .ico { animation: salto .32s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes salto { from { transform: translateY(5px) scale(.7); } }
+#contenido.brota .hemiciclo .esc {
+  transform-box: fill-box; transform-origin: center; animation: brotar .38s cubic-bezier(.3, 1.4, .5, 1) both; animation-delay: calc(var(--i, 0) * 1.3ms);
+}
+@keyframes brotar { from { opacity: 0; transform: translateY(7px) scale(.2); } }
+
+/* El mapa: profundidad en los bordes, provincias que se levantan y sombras de nubes. */
+.mapa-marco::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; box-shadow: inset 0 0 70px rgba(10, 25, 20, .22), inset 0 0 12px rgba(10, 25, 20, .18); }
+#mapa-modos, #mapa-zoom, #mapa-leyenda { z-index: 2; }
+@media (hover: hover) and (pointer: fine) {
+  .prov { transition: fill .45s, stroke .45s, filter .15s, transform .16s ease-out; }
+  .prov:hover { transform: translateY(-2px); }
+}
+.nubes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; mix-blend-mode: multiply; }
+.nubes i { position: absolute; left: 0; width: 46%; height: 42%; border-radius: 50%; background: radial-gradient(closest-side, rgba(22, 44, 38, .2), rgba(22, 44, 38, 0)); will-change: transform; animation: nube 80s linear infinite; }
+.nubes i:nth-child(1) { top: -6%; animation-delay: -12s; }
+.nubes i:nth-child(2) { top: 38%; width: 60%; height: 50%; animation-duration: 115s; animation-delay: -70s; }
+.nubes i:nth-child(3) { top: 62%; width: 36%; height: 34%; animation-duration: 64s; animation-delay: -40s; }
+@keyframes nube { from { transform: translateX(-110%); } to { transform: translateX(330%); } }
+html[data-anim="no"] .nubes { display: none; }
+
+/* Al pasar de mes, un destello cruza el mapa. */
+.mapa-marco.pasa-mes::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(105deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, .26) 50%, rgba(255, 255, 255, 0) 62%); animation: barrido .85s ease-out both; }
+@keyframes barrido { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .nubes { display: none; }
+  .prov:hover, #marca:hover .logo { transform: none; }
+}

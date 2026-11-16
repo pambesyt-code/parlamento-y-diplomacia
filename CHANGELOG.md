@@ -4,6 +4,28 @@ Todas las novedades del juego, de la más reciente a la más antigua.
 
 ---
 
+## ✨ Versión 2.4 — *«Con relieve»* (16/11/2026)
+
+### ✨ Novedades
+
+- 🧊 **Toques en 3D**:
+  - Los botones del menú y las tarjetas de opciones **se inclinan hacia el ratón**.
+  - El hemiciclo y el mapa del menú **giran un poco** siguiendo al puntero.
+  - Las ventanas **entran girando** hacia ti y el título del juego tiene relieve.
+  - La **insignia** de tu partido **da la vuelta como una moneda** cuando cambias su diseño (y en la cabecera, al pasar el ratón).
+- 🗺️ **Un mapa con más vida**:
+  - ☁️ **Sombras de nubes** que cruzan el mapa despacio.
+  - 🌄 Las **provincias se levantan** al pasar el ratón y los bordes del mapa ganan profundidad.
+  - 💫 Un **destello** recorre el mapa cada vez que pasa un mes.
+- 🏛️ Al abrir el Parlamento, los **350 escaños brotan en oleada**.
+- 📅 La **fecha cambia como una hoja de calendario** y el icono de cada pestaña da un saltito al abrirla.
+
+### 🔧 Cambios
+
+- ⚙️ Todo esto se apaga con la opción **Animaciones**. En móvil no hay inclinación (no hay ratón), pero sí nubes, destello y escaños.
+
+---
+
 ## 🎓 Versión 2.3 — *«De la mano»* (16/11/2026)
 
 ### ✨ Novedades

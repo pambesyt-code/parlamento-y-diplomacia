@@ -546,7 +546,7 @@ function hemicicloSVG(escanos) {
   for (const pid of ORDEN_HEMICICLO) {
     const color = partidoInfo(estado, pid).color;
     for (let k = 0; k < (escanos[pid] || 0); k++, i++) {
-      html += `<circle class="esc" data-p="${pid}" cx="${asientos[i].x}" cy="${asientos[i].y}" r="${r}" fill="${color}" stroke="${color}"/>`;
+      html += `<circle class="esc" data-p="${pid}" cx="${asientos[i].x}" cy="${asientos[i].y}" r="${r}" fill="${color}" stroke="${color}" style="--i:${i}"/>`;
     }
   }
   return `<svg class="hemiciclo ${total > 150 ? 'denso' : ''}" viewBox="0 0 300 136" role="img" aria-label="Reparto de escaños">${html}</svg>`;
@@ -766,6 +766,10 @@ function renderContenido() {
     cont.classList.remove('entra');
     void cont.offsetWidth;
     cont.classList.add('entra');
+    // «brota» dura solo lo que la entrada: así los escaños no vuelven a brotar con cada cambio del panel.
+    cont.classList.add('brota');
+    clearTimeout(cont._brota);
+    cont._brota = setTimeout(() => cont.classList.remove('brota'), 1100);
     ui.animTab = false;
   }
 }
@@ -1114,6 +1118,7 @@ function render() {
   renderChat();
   renderModal();
   renderTutorial();
+  despuesDeRender();
 }
 
 function entrarJuego() {
@@ -1357,6 +1362,7 @@ const COLORES_VIVOS = { 'cfg-color': 'color', 'cfg-color2': 'color2', 'cfg-color
 function refrescarInsignia() {
   const logo = $('.vista-partido .logo');
   if (logo) logo.outerHTML = logoPartido(ui.cfg, 'grande');
+  girarInsigniaSiCambia();
 }
 
 document.addEventListener('input', ev => {
