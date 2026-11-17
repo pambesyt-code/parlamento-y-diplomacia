@@ -614,7 +614,10 @@ function renderTutorial() {
     el.classList.add('tut-foco');
     if (t.irAlFoco && (!enModal || sobreModal)) {
       t.irAlFoco = false;
-      if (!visibleEnPantalla(el)) el.scrollIntoView({ behavior: animar() ? 'smooth' : 'auto', block: 'center' });
+      // Un panel más alto que lo que se ve se lleva por arriba: centrado, su título quedaría fuera de la pantalla.
+      const util = bordeInferior() - ($('.cabecera').getBoundingClientRect().bottom > 0 ? $('.cabecera').getBoundingClientRect().bottom : 0);
+      const alto = el.getBoundingClientRect().height;
+      if (!visibleEnPantalla(el)) el.scrollIntoView({ behavior: animar() ? 'smooth' : 'auto', block: alto > util - 60 ? 'start' : 'center' });
     }
   }
   t.foco = sel;

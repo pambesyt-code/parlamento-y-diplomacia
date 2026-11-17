@@ -1095,7 +1095,10 @@ html[data-anim="no"] .nubes { display: none; }
 #contenido h3 > .ico:first-child, #contenido .tarjeta-cab > b > .ico:first-child { color: var(--acento); }
 #contenido .tarjeta:not(.directiva):not(.va-mal) { box-shadow: inset 0 3px 0 var(--acento); }
 #contenido .btn.mini:not(:disabled):not(.peligro):not(.claro) { border-color: var(--acento); }
-#contenido .btn.mini:hover:not(:disabled):not(.peligro):not(.claro) { background: var(--acento); border-color: var(--acento); color: #fff; }
+@media (hover: hover) {
+  #contenido .btn.mini:hover:not(:disabled):not(.peligro):not(.claro) { background: var(--acento); border-color: var(--acento); color: #fff; }
+  :root[data-tema="oscuro"] #contenido .btn.mini:hover:not(:disabled):not(.peligro):not(.claro) { color: #1b221e; }
+}
 
 /* Cifras de la cabecera: cada una con su color. */
 #st-fecha { --ci: #e8e0c8; }
@@ -1149,6 +1152,7 @@ html[data-anim="no"] .nubes { display: none; }
 
 /* Los encabezados de tarjeta se parten en dos líneas en vez de desbordar (texto grande, nombres largos). */
 .tarjeta-cab { flex-wrap: wrap; row-gap: 2px; }
+.edif { grid-template-columns: auto minmax(0, 1fr) auto; }
 .acciones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .acciones .btn { white-space: normal; text-align: center; }
 
@@ -1223,6 +1227,8 @@ html[data-anim="no"] .nubes { display: none; }
   body.con-tutorial main { padding-bottom: calc(var(--alto-tut, 200px) + var(--alto-barra) + 28px); }
   .tut-foco { scroll-margin: 20px 0 calc(var(--alto-tut, 0px) + var(--alto-barra) + 28px); }
   body.tut-modal #modal { padding-bottom: calc(var(--alto-tut, 220px) + var(--alto-barra) + 28px); }
+  body.tut-modal #modal .ventana { max-height: calc(100vh - var(--alto-tut, 220px) - var(--alto-barra) - 48px); max-height: calc(100dvh - var(--alto-tut, 220px) - var(--alto-barra) - 48px); }
+  .tarjeta.tramite { scroll-margin-top: 12px; }
 }
 
 /* ---------- Móvil ---------- */
@@ -1250,12 +1256,21 @@ html[data-anim="no"] .nubes { display: none; }
     width: 100%; max-height: 88vh; max-height: 88dvh; padding: 22px 16px calc(18px + env(safe-area-inset-bottom, 0px)); border-radius: 18px 18px 0 0;
     animation: hoja-sube .3s cubic-bezier(.2, .8, .2, 1);
   }
-  .ventana::before { content: ''; display: block; width: 40px; height: 4px; margin: -12px auto 14px; border-radius: 2px; background: var(--linea); }
   #modal.saliendo .ventana { animation: hoja-baja .18s ease-in forwards; }
   /* Con una ventana abierta, los avisos salen arriba para no tapar sus botones. */
   #modal:not([hidden]) ~ #avisos { bottom: auto; top: calc(10px + env(safe-area-inset-top, 0px)); }
   body.tut-modal .ventana { border-radius: 0 0 18px 18px; }
-  body.tut-modal .ventana::before { display: none; }
+
+  /* Edificios y sedes: el botón pasa debajo del texto en vez de apretarlo. */
+  .edif { grid-template-columns: auto minmax(0, 1fr); }
+  .edif-acc { grid-column: 1 / -1; max-width: none; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px 10px; text-align: right; }
+
+  /* La ley en trámite: el recuento y los botones de votar suben justo bajo el título; el detalle de cada partido, debajo. */
+  #contenido[data-tab="parlamento"] .tarjeta.tramite:not(.pleno-abierto) { display: flex; flex-direction: column; }
+  #contenido[data-tab="parlamento"] .tarjeta.tramite:not(.pleno-abierto) > .recuento { order: 1; }
+  #contenido[data-tab="parlamento"] .tarjeta.tramite:not(.pleno-abierto) > .botones { order: 2; margin-bottom: 6px; }
+  #contenido[data-tab="parlamento"] .tarjeta.tramite:not(.pleno-abierto) > .voto { order: 3; }
+  #contenido[data-tab="parlamento"] .tarjeta.tramite:not(.pleno-abierto) > .nota { order: 4; }
 
   /* Las inversiones recomendadas pasan el nombre a una línea propia: cifras y botón van debajo. */
   .fila.inversion { flex-wrap: wrap; row-gap: 4px; }
