@@ -70,6 +70,11 @@ function construirMapa() {
     <g id="mapa-guerra"></g><path id="mapa-sel" class="f-sel" d=""/>${rotulos}<g id="mapa-pips"></g>`;
   $('#mapa-pips')._html = $('#mapa-guerra')._html = null;
   ui.mapaVersion = estado.mapaVersion;
+  // En el móvil el mapa es pequeño: al empezar se abre ya centrado en tu país.
+  if (ui.centrarMovil) {
+    ui.centrarMovil = false;
+    if (matchMedia('(max-width: 760px)').matches) { const v = vistaMiPais(); if (v) ajustarVista(v); }
+  }
 }
 
 // ---------- Zoom y desplazamiento del mapa ----------
@@ -341,6 +346,7 @@ function renderCabecera() {
     }
     caja.classList.toggle('alerta', !!(st.alerta && st.alerta(s)));
   }
+  renderBarra(s, clave);
   const elFecha = $('#st-fecha .v');
   if (ui.previo.mes !== undefined && ui.previo.mes !== s.mes && animar()) {
     elFecha.classList.remove('giro');
@@ -772,6 +778,23 @@ function renderContenido() {
     cont._brota = setTimeout(() => cont.classList.remove('brota'), 1100);
     ui.animTab = false;
   }
+  cont.dataset.tab = ui.tab;
+  if (ui.irAlPanel) { ui.irAlPanel = false; irAlPanel(); }
+}
+
+// En pantallas estrechas las pestañas están abajo y su contenido, justo debajo del mapa:
+// al pulsar una, si el contenido queda lejos de la vista se sube hasta él.
+const PANTALLA_ESTRECHA = matchMedia('(max-width: 1040px)');
+function irAlPanel() {
+  const r = $('#contenido').getBoundingClientRect();
+  if (r.top < 0 || r.top > innerHeight * 0.55) scrollTo({ top: scrollY + r.top - 8, behavior: animar() ? 'smooth' : 'auto' });
+}
+
+// Las cifras de la barra inferior (solo se ve en pantallas estrechas): las tres que más se miran en cada modo.
+const CIFRAS_BARRA = { gobierno: ['dinero', 'cp', 'popularidad'], carrera: ['fondos', 'cp', 'encuesta'], provincial: ['fondos', 'cp', 'encuesta'], oposicion: ['escanos', 'encuesta', 'cp'] };
+function renderBarra(s, clave) {
+  const lista = (CIFRAS_BARRA[clave] || []).map(k => STATS[clave].find(st => st.k === k)).filter(st => st && st.valor);
+  ponerHTML($('#dock-info'), lista.map(st => `<span class="dock-cifra" id="dk-${st.k}">${ico(st.icono)}<b>${(st.fmt || (n => n))(st.valor(s))}</b></span>`).join(''));
 }
 
 // ---------- Bajo el mapa: asesora, objetivos y prensa ----------
@@ -1100,6 +1123,7 @@ function render() {
   const enMenu = ui.pantalla === 'menu' || ui.pantalla === 'sala';
   $('#pantalla-menu').hidden = !enMenu;
   $('#pantalla-juego').hidden = ui.pantalla !== 'juego';
+  document.body.classList.toggle('en-juego', ui.pantalla === 'juego' && !!estado);
   if (ui.pantalla === 'menu') renderMenu();
   else if (ui.pantalla === 'sala') renderSala();
   else if (estado) {
@@ -1128,6 +1152,7 @@ function entrarJuego() {
     pantalla: 'juego', ventana: null, tab: carrera ? 'carrera' : 'provincia', animTab: true, prov: null, pais: null,
     modoMapa: carrera ? 'electoral' : 'politico', filtroLey: 'todas', cartera: null, previo: {}, pips: null,
     animVoto: '', animElec: '', timers: [], objetivo: null, mapaVersion: -1, vista: null, filtroPais: 'cerca', ultimo: null, salaMundo: null,
+    centrarMovil: true,
   });
   scrollTo(0, 0);
 }
@@ -1221,10 +1246,10 @@ const acciones = {
   },
 
   // Partida
-  tab: d => { if (ui.tab !== d.v) ui.animTab = true; ui.tab = d.v; },
+  tab: d => { if (ui.tab !== d.v) ui.animTab = true; ui.tab = d.v; if (PANTALLA_ESTRECHA.matches) ui.irAlPanel = true; },
   prov: d => {
     const p = PROV_POR_ID[d.prov];
-    if (p.pais === PAIS_JUGADOR.id) { ui.prov = p.id; ui.tab = 'provincia'; ui.animTab = true; }
+    if (p.pais === PAIS_JUGADOR.id) { ui.prov = p.id; ui.tab = 'provincia'; ui.animTab = true; if (PANTALLA_ESTRECHA.matches) ui.irAlPanel = true; }
     // La diplomacia solo existe cuando gobiernas.
     else if (estado.modo === 'gobierno') {
       ui.animTab = true;
@@ -1429,14 +1454,25 @@ document.addEventListener('submit', ev => {
 
 // Encuadra el mapa en tu país.
 function verMiPais() {
+  const v = vistaMiPais();
+  if (v) animarVista(v);
+}
+
+// La parte del mapa que encuadra tu país.
+function vistaMiPais() {
   const ps = provinciasJugador().map(p => GEO.provs[p.id]);
-  if (!ps.length) return;
+  if (!ps.length) return null;
   const xs = ps.map(p => p.cx), ys = ps.map(p => p.cy), m = 70, [, , bw, bh] = GEO.viewBox;
   const x0 = Math.min(...xs) - m, x1 = Math.max(...xs) + m, y0 = Math.min(...ys) - m, y1 = Math.max(...ys) + m;
   const k = Math.max((x1 - x0) / bw, (y1 - y0) / bh), w = bw * k, h = bh * k;
-  animarVista([(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - h / 2, w, h]);
+  return [(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - h / 2, w, h];
 }
 
 aplicarOpciones();
 prepararTooltip();
+
+// La altura de la cabecera cambia al girar el móvil o cambiar el tamaño de la ventana: lo que cuelga de ella se recoloca.
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(() => document.documentElement.style.setProperty('--alto-cab', $('.cabecera').offsetHeight + 'px')).observe($('.cabecera'));
+}
 render();

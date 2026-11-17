@@ -521,11 +521,19 @@ function recortado(el, r = el.getBoundingClientRect()) {
   return !!c && (r.top < c.top - 1 || r.bottom > c.bottom + 1);
 }
 
+// Dónde empieza la barra inferior de pantallas estrechas (si no la hay, el final de la pantalla).
+function bordeInferior() {
+  const d = $('#dock-info');
+  return d && getComputedStyle(d).position === 'fixed' ? d.getBoundingClientRect().top : innerHeight;
+}
+
 // ¿Se ve entero el elemento, sin que lo tapen la cabecera fija ni la tarjeta del tutorial?
 function visibleEnPantalla(el) {
   const r = el.getBoundingClientRect(), cab = ui.pantalla === 'juego' ? $('.cabecera').getBoundingClientRect().bottom : 0;
   if (recortado(el, r)) return false;
-  return r.top >= Math.max(0, cab) && r.bottom <= innerHeight - 8;
+  // Las pestañas viven dentro de la propia barra inferior: ahí siempre se ven.
+  if (el.closest('#tabs') && getComputedStyle($('#tabs')).position === 'fixed') return true;
+  return r.top >= Math.max(0, cab) && r.bottom <= bordeInferior() - 8;
 }
 
 function htmlElegirTutorial() {
@@ -634,7 +642,7 @@ function colocarDedoTutorial() {
   const el = ui.tutorial && ui.tutorial.dedo && enTutorial() ? $('.tut-foco') : null;
   const r = el ? el.getBoundingClientRect() : null;
   const cab = ui.pantalla === 'juego' && $('.cabecera') ? $('.cabecera').getBoundingClientRect().bottom : 0;
-  const visible = r && r.width > 0 && r.width <= 460 && r.height <= 200 && r.bottom > 0 && r.top < innerHeight && !recortado(el, r)
+  const visible = r && r.width > 0 && r.width <= 460 && r.height <= 200 && r.bottom > 0 && r.top < bordeInferior() - 4 && !recortado(el, r)
     // Dentro de la cabecera fija todo vale; fuera, que no lo tape.
     && (r.top >= cab - 2 || r.bottom <= cab + 2);
   dedo.hidden = !visible;

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Parlamento y Diplomacia</title>
   <meta name="description" content="Juego de política y diplomacia en el navegador: gobierna tu país, negocia cada ley, defiende tus fronteras y gana las elecciones. Un jugador o multijugador con amigos.">
   <meta name="theme-color" content="#152c24">
@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Besley:wght@500;700;800&family=Sofia+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=2.4">
+  <link rel="stylesheet" href="css/style.css?v=2.5">
 </head>
 <body>
   <div id="pantalla-menu" class="pantalla">
@@ -57,6 +57,7 @@
         <div id="contenido"></div>
       </aside>
     </main>
+    <div id="dock-info" aria-hidden="true"></div>
   </div>
 
   <div id="modal" hidden></div>
@@ -73,45 +74,45 @@
 
   <!-- PeerJS conecta los navegadores para el multijugador. Sin internet, el modo de un jugador funciona igual. -->
   <script async src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/i18n.js?v=2.4"></script>
-  <script src="js/idiomas/datos-1.js?v=2.4"></script>
-  <script src="js/idiomas/datos-2.js?v=2.4"></script>
-  <script src="js/idiomas/datos-3.js?v=2.4"></script>
-  <script src="js/idiomas/reglas.js?v=2.4"></script>
-  <script src="js/idiomas/interfaz-1.js?v=2.4"></script>
-  <script src="js/idiomas/interfaz-2.js?v=2.4"></script>
-  <script src="js/idiomas/interfaz-3.js?v=2.4"></script>
-  <script src="js/idiomas/tutorial.js?v=2.4"></script>
-  <script src="js/idiomas/tutorial2.js?v=2.4"></script>
-  <script src="js/idiomas/v21-datos.js?v=2.4"></script>
-  <script src="js/idiomas/v21-reglas.js?v=2.4"></script>
-  <script src="js/idiomas/v21-interfaz.js?v=2.4"></script>
-  <script src="js/idiomas/v22.js?v=2.4"></script>
-  <script src="js/novedades.js?v=2.4"></script>
-  <script src="js/data.js?v=2.4"></script>
-  <script src="js/iconos.js?v=2.4"></script>
-  <script src="js/mapa.js?v=2.4"></script>
-  <script src="js/europa.js?v=2.4"></script>
-  <script src="js/game.js?v=2.4"></script>
-  <script src="js/carrera.js?v=2.4"></script>
-  <script src="js/corrupcion.js?v=2.4"></script>
-  <script src="js/guerra.js?v=2.4"></script>
-  <script src="js/oposicion.js?v=2.4"></script>
-  <script src="js/pactos.js?v=2.4"></script>
-  <script src="js/regimenes.js?v=2.4"></script>
-  <script src="js/acciones.js?v=2.4"></script>
-  <script src="js/red.js?v=2.4"></script>
-  <script src="js/ui-base.js?v=2.4"></script>
-  <script src="js/efectos.js?v=2.4"></script>
-  <script src="js/ui-menu.js?v=2.4"></script>
-  <script src="js/ui-carrera.js?v=2.4"></script>
-  <script src="js/ui-guerra.js?v=2.4"></script>
-  <script src="js/ui-multi.js?v=2.4"></script>
-  <script src="js/ui-oposicion.js?v=2.4"></script>
-  <script src="js/ui-pactos.js?v=2.4"></script>
-  <script src="js/tutorial.js?v=2.4"></script>
-  <script src="js/privacidad.js?v=2.4"></script>
-  <script src="js/anuncios.js?v=2.4"></script>
-  <script src="js/ui.js?v=2.4"></script>
+  <script src="js/i18n.js?v=2.5"></script>
+  <script src="js/idiomas/datos-1.js?v=2.5"></script>
+  <script src="js/idiomas/datos-2.js?v=2.5"></script>
+  <script src="js/idiomas/datos-3.js?v=2.5"></script>
+  <script src="js/idiomas/reglas.js?v=2.5"></script>
+  <script src="js/idiomas/interfaz-1.js?v=2.5"></script>
+  <script src="js/idiomas/interfaz-2.js?v=2.5"></script>
+  <script src="js/idiomas/interfaz-3.js?v=2.5"></script>
+  <script src="js/idiomas/tutorial.js?v=2.5"></script>
+  <script src="js/idiomas/tutorial2.js?v=2.5"></script>
+  <script src="js/idiomas/v21-datos.js?v=2.5"></script>
+  <script src="js/idiomas/v21-reglas.js?v=2.5"></script>
+  <script src="js/idiomas/v21-interfaz.js?v=2.5"></script>
+  <script src="js/idiomas/v22.js?v=2.5"></script>
+  <script src="js/novedades.js?v=2.5"></script>
+  <script src="js/data.js?v=2.5"></script>
+  <script src="js/iconos.js?v=2.5"></script>
+  <script src="js/mapa.js?v=2.5"></script>
+  <script src="js/europa.js?v=2.5"></script>
+  <script src="js/game.js?v=2.5"></script>
+  <script src="js/carrera.js?v=2.5"></script>
+  <script src="js/corrupcion.js?v=2.5"></script>
+  <script src="js/guerra.js?v=2.5"></script>
+  <script src="js/oposicion.js?v=2.5"></script>
+  <script src="js/pactos.js?v=2.5"></script>
+  <script src="js/regimenes.js?v=2.5"></script>
+  <script src="js/acciones.js?v=2.5"></script>
+  <script src="js/red.js?v=2.5"></script>
+  <script src="js/ui-base.js?v=2.5"></script>
+  <script src="js/efectos.js?v=2.5"></script>
+  <script src="js/ui-menu.js?v=2.5"></script>
+  <script src="js/ui-carrera.js?v=2.5"></script>
+  <script src="js/ui-guerra.js?v=2.5"></script>
+  <script src="js/ui-multi.js?v=2.5"></script>
+  <script src="js/ui-oposicion.js?v=2.5"></script>
+  <script src="js/ui-pactos.js?v=2.5"></script>
+  <script src="js/tutorial.js?v=2.5"></script>
+  <script src="js/privacidad.js?v=2.5"></script>
+  <script src="js/anuncios.js?v=2.5"></script>
+  <script src="js/ui.js?v=2.5"></script>
 </body>
 </html>

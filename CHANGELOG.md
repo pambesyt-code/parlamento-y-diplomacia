@@ -4,6 +4,34 @@ Todas las novedades del juego, de la más reciente a la más antigua.
 
 ---
 
+## 🧭 Versión 2.5 — *«A tu alcance»* (18/11/2026)
+
+### ✨ Novedades
+
+- 📱 **Barra inferior en el móvil y la tableta**: las pestañas (Provincias, Economía, Parlamento…) bajan al borde de la pantalla, al alcance del pulgar. **Al tocar una, te lleva directo a su contenido**, sin tener que buscarlo más abajo.
+- 💰 **Tus cifras, siempre a la vista**: justo encima de las pestañas se quedan fijos el **dinero**, el **capital político** y la **popularidad** (o los fondos y la encuesta, en la carrera), junto al botón **Siguiente mes**.
+- 🎨 **Un color para cada sección**: Provincias 🟠, Economía 🟢, Parlamento 🔵, Gobierno 🟡, Diplomacia 🩵, Defensa 🔴 y Sociedad 🟣. El color marca el icono de la pestaña, el título y un filo en las tarjetas, para que sepas siempre dónde estás.
+- 🏷️ **Cifras de la cabecera con iconos de color** y **menú principal** con un icono de color en cada botón.
+- 🗺️ **Un mapa que se lee en el móvil**: más alto, **se abre centrado en tu país**, con las modalidades deslizables y la leyenda debajo, en una fila que se desliza.
+- 🪟 **Las ventanas son hojas que suben desde abajo** en el móvil, con su asa para arrastrar.
+- 🖥️ **En PC**: la cabecera queda en **dos filas parejas** y las pestañas muestran su **número (1 al 7)**, el atajo de teclado de siempre.
+
+### 🔧 Cambios
+
+- 👆 Botones, selectores y filtros más grandes en pantallas táctiles (al menos 40 píxeles).
+- 📋 Las filas de partidos y las **mejores inversiones** se parten en dos líneas en vez de cortar los nombres.
+- 🔔 Con una ventana abierta, los **avisos salen arriba** para no tapar sus botones.
+- 🎓 El **tutorial** se coloca encima de la barra inferior y su puntero la tiene en cuenta.
+- 🔤 Con texto grande o el tema oscuro, todo sigue cabiendo en pantalla.
+
+### 🐛 Correcciones
+
+- 📐 En el móvil, la pestaña **Economía** hacía la página un poco más ancha que la pantalla.
+- 🔤 Con **texto grande**, las tarjetas de Sociedad y Diplomacia se salían por la derecha.
+- 📏 Al girar el móvil o cambiar el tamaño de la ventana, el panel de la derecha se quedaba mal colocado hasta el siguiente turno.
+
+---
+
 ## ✨ Versión 2.4 — *«Con relieve»* (16/11/2026)
 
 ### ✨ Novedades
