@@ -3,6 +3,19 @@
 // Al publicar una versión: añadir su entrada arriba, aquí y en CHANGELOG.md.
 
 const TEXTO_NOVEDADES = `
+## 📲 Versión 2.5.1 — *«En tu bolsillo»* (18/11/2026)
+
+### ✨ Novedades
+
+- 🍎 **Instálalo en el iPhone**: abre el juego en **Safari**, toca **Compartir** y luego **«Añadir a pantalla de inicio»**. Tendrás su **icono** y se abrirá **a pantalla completa**, como una app más.
+- 🤖 En **Android** también se puede instalar desde **Chrome** (menú ⋮ → **«Instalar app»**), además de con la **app para Android**.
+
+### 🔧 Cambios
+
+- 🏛️ El juego tiene ahora **icono propio** al guardarlo en la pantalla de inicio o en marcadores.
+
+---
+
 ## 🧭 Versión 2.5 — *«A tu alcance»* (18/11/2026)
 
 ### ✨ Novedades

@@ -6,11 +6,18 @@
   <title>Parlamento y Diplomacia</title>
   <meta name="description" content="Juego de política y diplomacia en el navegador: gobierna tu país, negocia cada ley, defiende tus fronteras y gana las elecciones. Un jugador o multijugador con amigos.">
   <meta name="theme-color" content="#152c24">
+  <!-- Para instalarlo como app: «Añadir a pantalla de inicio» en el iPhone (Safari) o «Instalar app» en Android (Chrome). -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="img/icono-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Parlamento">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='31' fill='%231e3d32'/%3E%3Ccircle cx='32' cy='32' r='27' fill='none' stroke='%23c9a24b' stroke-width='2'/%3E%3Cpath d='M14 44a18 18 0 0 1 36 0' fill='none' stroke='%23f2ecd9' stroke-width='5' stroke-dasharray='2 5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='17' r='5' fill='%23c9a24b'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Besley:wght@500;700;800&family=Sofia+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=2.5.1">
+  <link rel="stylesheet" href="css/style.css?v=2.5.2">
 </head>
 <body>
   <div id="pantalla-menu" class="pantalla">
@@ -74,45 +81,45 @@
 
   <!-- PeerJS conecta los navegadores para el multijugador. Sin internet, el modo de un jugador funciona igual. -->
   <script async src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/i18n.js?v=2.5.1"></script>
-  <script src="js/idiomas/datos-1.js?v=2.5.1"></script>
-  <script src="js/idiomas/datos-2.js?v=2.5.1"></script>
-  <script src="js/idiomas/datos-3.js?v=2.5.1"></script>
-  <script src="js/idiomas/reglas.js?v=2.5.1"></script>
-  <script src="js/idiomas/interfaz-1.js?v=2.5.1"></script>
-  <script src="js/idiomas/interfaz-2.js?v=2.5.1"></script>
-  <script src="js/idiomas/interfaz-3.js?v=2.5.1"></script>
-  <script src="js/idiomas/tutorial.js?v=2.5.1"></script>
-  <script src="js/idiomas/tutorial2.js?v=2.5.1"></script>
-  <script src="js/idiomas/v21-datos.js?v=2.5.1"></script>
-  <script src="js/idiomas/v21-reglas.js?v=2.5.1"></script>
-  <script src="js/idiomas/v21-interfaz.js?v=2.5.1"></script>
-  <script src="js/idiomas/v22.js?v=2.5.1"></script>
-  <script src="js/novedades.js?v=2.5.1"></script>
-  <script src="js/data.js?v=2.5.1"></script>
-  <script src="js/iconos.js?v=2.5.1"></script>
-  <script src="js/mapa.js?v=2.5.1"></script>
-  <script src="js/europa.js?v=2.5.1"></script>
-  <script src="js/game.js?v=2.5.1"></script>
-  <script src="js/carrera.js?v=2.5.1"></script>
-  <script src="js/corrupcion.js?v=2.5.1"></script>
-  <script src="js/guerra.js?v=2.5.1"></script>
-  <script src="js/oposicion.js?v=2.5.1"></script>
-  <script src="js/pactos.js?v=2.5.1"></script>
-  <script src="js/regimenes.js?v=2.5.1"></script>
-  <script src="js/acciones.js?v=2.5.1"></script>
-  <script src="js/red.js?v=2.5.1"></script>
-  <script src="js/ui-base.js?v=2.5.1"></script>
-  <script src="js/efectos.js?v=2.5.1"></script>
-  <script src="js/ui-menu.js?v=2.5.1"></script>
-  <script src="js/ui-carrera.js?v=2.5.1"></script>
-  <script src="js/ui-guerra.js?v=2.5.1"></script>
-  <script src="js/ui-multi.js?v=2.5.1"></script>
-  <script src="js/ui-oposicion.js?v=2.5.1"></script>
-  <script src="js/ui-pactos.js?v=2.5.1"></script>
-  <script src="js/tutorial.js?v=2.5.1"></script>
-  <script src="js/privacidad.js?v=2.5.1"></script>
-  <script src="js/anuncios.js?v=2.5.1"></script>
-  <script src="js/ui.js?v=2.5.1"></script>
+  <script src="js/i18n.js?v=2.5.2"></script>
+  <script src="js/idiomas/datos-1.js?v=2.5.2"></script>
+  <script src="js/idiomas/datos-2.js?v=2.5.2"></script>
+  <script src="js/idiomas/datos-3.js?v=2.5.2"></script>
+  <script src="js/idiomas/reglas.js?v=2.5.2"></script>
+  <script src="js/idiomas/interfaz-1.js?v=2.5.2"></script>
+  <script src="js/idiomas/interfaz-2.js?v=2.5.2"></script>
+  <script src="js/idiomas/interfaz-3.js?v=2.5.2"></script>
+  <script src="js/idiomas/tutorial.js?v=2.5.2"></script>
+  <script src="js/idiomas/tutorial2.js?v=2.5.2"></script>
+  <script src="js/idiomas/v21-datos.js?v=2.5.2"></script>
+  <script src="js/idiomas/v21-reglas.js?v=2.5.2"></script>
+  <script src="js/idiomas/v21-interfaz.js?v=2.5.2"></script>
+  <script src="js/idiomas/v22.js?v=2.5.2"></script>
+  <script src="js/novedades.js?v=2.5.2"></script>
+  <script src="js/data.js?v=2.5.2"></script>
+  <script src="js/iconos.js?v=2.5.2"></script>
+  <script src="js/mapa.js?v=2.5.2"></script>
+  <script src="js/europa.js?v=2.5.2"></script>
+  <script src="js/game.js?v=2.5.2"></script>
+  <script src="js/carrera.js?v=2.5.2"></script>
+  <script src="js/corrupcion.js?v=2.5.2"></script>
+  <script src="js/guerra.js?v=2.5.2"></script>
+  <script src="js/oposicion.js?v=2.5.2"></script>
+  <script src="js/pactos.js?v=2.5.2"></script>
+  <script src="js/regimenes.js?v=2.5.2"></script>
+  <script src="js/acciones.js?v=2.5.2"></script>
+  <script src="js/red.js?v=2.5.2"></script>
+  <script src="js/ui-base.js?v=2.5.2"></script>
+  <script src="js/efectos.js?v=2.5.2"></script>
+  <script src="js/ui-menu.js?v=2.5.2"></script>
+  <script src="js/ui-carrera.js?v=2.5.2"></script>
+  <script src="js/ui-guerra.js?v=2.5.2"></script>
+  <script src="js/ui-multi.js?v=2.5.2"></script>
+  <script src="js/ui-oposicion.js?v=2.5.2"></script>
+  <script src="js/ui-pactos.js?v=2.5.2"></script>
+  <script src="js/tutorial.js?v=2.5.2"></script>
+  <script src="js/privacidad.js?v=2.5.2"></script>
+  <script src="js/anuncios.js?v=2.5.2"></script>
+  <script src="js/ui.js?v=2.5.2"></script>
 </body>
 </html>
